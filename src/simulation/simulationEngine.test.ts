@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { simulate } from './simulationEngine'
+import { simulate, tessellateArc } from './simulationEngine'
 import { parseGCode } from '../parser/parser'
 import type { ToolDefinition } from '../tools/types'
 import type { SimulationInput } from './types'
+import type { Operation } from '../parser/types'
 
 // ── Test fixtures ────────────────────────────────────────────────
 
@@ -178,6 +179,39 @@ M30
     )
 
     expect(result.csgRequests.every((r) => r.type === 'mill')).toBe(true)
+  })
+
+  it('propagates tipType from tool definition', () => {
+    const result = simulate(
+      makeInput(`
+G90
+T1 M6
+M3 S18000
+G0 X10 Y10 Z5
+G1 Z-5 F3000
+G1 X100 F5000
+M5
+T2 M6
+M3 S12000
+G0 X50 Y50 Z5
+G1 Z-20 F1500
+M5
+T3 M6
+M3 S15000
+G0 X20 Y20 Z5
+G1 Z-3 F2000
+M5
+M30
+`),
+    )
+
+    const flatOps = result.csgRequests.filter((r) => r.tipType === 'flat-end-mill')
+    const drillOps = result.csgRequests.filter((r) => r.tipType === 'drill')
+    const ballOps = result.csgRequests.filter((r) => r.tipType === 'ball-end-mill')
+
+    expect(flatOps.length).toBeGreaterThan(0)
+    expect(drillOps.length).toBeGreaterThan(0)
+    expect(ballOps.length).toBeGreaterThan(0)
   })
 
   it('classifies drill vertical-only move as drill', () => {
@@ -485,5 +519,244 @@ M30
 `),
     )
     expect(result.csgRequests).toHaveLength(1)
+  })
+})
+
+// ── Arc tessellation ────────────────────────────────────────────
+
+describe('tessellateArc', () => {
+  const makeArcOp = (overrides: Partial<Operation>): Operation => ({
+    type: 'arc-cw',
+    fromX: 10, fromY: 0, fromZ: -5,
+    toX: 0, toY: 10, toZ: -5,
+    feedRate: 1000,
+    toolNumber: 1,
+    spindleState: 'cw',
+    spindleSpeed: 18000,
+    lineNumber: 1,
+    centerI: -10, centerJ: 0,
+    ...overrides,
+  })
+
+  it('produces multiple linear segments for a 90-degree arc', () => {
+    // Arc from (10,0) to (0,10) around center (0,0), radius 10, CW
+    const op = makeArcOp({
+      fromX: 10, fromY: 0,
+      toX: 0, toY: 10,
+      centerI: -10, centerJ: 0,
+    })
+    const segments = tessellateArc(op)
+    expect(segments.length).toBeGreaterThanOrEqual(2)
+    expect(segments.length).toBeLessThanOrEqual(200)
+
+    // First segment starts at arc start
+    expect(segments[0].fromX).toBeCloseTo(10, 1)
+    expect(segments[0].fromY).toBeCloseTo(0, 1)
+
+    // Last segment ends at arc end
+    const last = segments[segments.length - 1]
+    expect(last.toX).toBeCloseTo(0, 1)
+    expect(last.toY).toBeCloseTo(10, 1)
+  })
+
+  it('full circle (start == end) produces closed arc', () => {
+    const op = makeArcOp({
+      fromX: 10, fromY: 0,
+      toX: 10, toY: 0,
+      centerI: -10, centerJ: 0,
+    })
+    const segments = tessellateArc(op)
+    expect(segments.length).toBeGreaterThanOrEqual(10)
+
+    // Last segment ends at start
+    const last = segments[segments.length - 1]
+    expect(last.toX).toBeCloseTo(10, 1)
+    expect(last.toY).toBeCloseTo(0, 1)
+  })
+
+  it('CCW arc produces segments in opposite direction', () => {
+    const cwOp = makeArcOp({
+      type: 'arc-cw',
+      fromX: 10, fromY: 0,
+      toX: 0, toY: 10,
+      centerI: -10, centerJ: 0,
+    })
+    const ccwOp = makeArcOp({
+      type: 'arc-ccw',
+      fromX: 10, fromY: 0,
+      toX: 0, toY: 10,
+      centerI: -10, centerJ: 0,
+    })
+
+    const cwSegs = tessellateArc(cwOp)
+    const ccwSegs = tessellateArc(ccwOp)
+
+    // Both start and end at same points but sweep different directions
+    expect(cwSegs[0].fromX).toBeCloseTo(ccwSegs[0].fromX, 1)
+    expect(cwSegs[cwSegs.length - 1].toX).toBeCloseTo(ccwSegs[ccwSegs.length - 1].toX, 1)
+
+    // CW long arc (270°) vs CCW short arc (90°) — CW should have more segments
+    expect(cwSegs.length).toBeGreaterThan(ccwSegs.length)
+  })
+
+  it('R-form arc produces valid segments', () => {
+    const op = makeArcOp({
+      fromX: 0, fromY: 0,
+      toX: 10, toY: 10,
+      centerI: undefined, centerJ: undefined,
+      radius: 10,
+    })
+    const segments = tessellateArc(op)
+    expect(segments.length).toBeGreaterThanOrEqual(2)
+    expect(segments[0].fromX).toBeCloseTo(0, 1)
+    expect(segments[0].fromY).toBeCloseTo(0, 1)
+    const last = segments[segments.length - 1]
+    expect(last.toX).toBeCloseTo(10, 1)
+    expect(last.toY).toBeCloseTo(10, 1)
+  })
+
+  it('preserves Z across flat arc', () => {
+    const op = makeArcOp({
+      fromZ: -3, toZ: -3,
+    })
+    const segments = tessellateArc(op)
+    for (const seg of segments) {
+      expect(seg.fromZ).toBeCloseTo(-3, 5)
+      expect(seg.toZ).toBeCloseTo(-3, 5)
+    }
+  })
+
+  it('interpolates Z for helical arc', () => {
+    const op = makeArcOp({
+      fromZ: 0, toZ: -10,
+    })
+    const segments = tessellateArc(op)
+    // First segment starts at Z=0
+    expect(segments[0].fromZ).toBeCloseTo(0, 3)
+    // Last segment ends at Z=-10
+    expect(segments[segments.length - 1].toZ).toBeCloseTo(-10, 3)
+    // Z decreases monotonically
+    for (let i = 1; i < segments.length; i++) {
+      expect(segments[i].fromZ).toBeLessThanOrEqual(segments[i - 1].toZ + 0.001)
+    }
+  })
+
+  it('segments are connected end-to-end', () => {
+    const op = makeArcOp({})
+    const segments = tessellateArc(op)
+    for (let i = 1; i < segments.length; i++) {
+      expect(segments[i].fromX).toBeCloseTo(segments[i - 1].toX, 5)
+      expect(segments[i].fromY).toBeCloseTo(segments[i - 1].toY, 5)
+      expect(segments[i].fromZ).toBeCloseTo(segments[i - 1].toZ, 5)
+    }
+  })
+})
+
+// ── Arc simulation integration ──────────────────────────────────
+
+describe('simulate — arc operations', () => {
+  it('G2 arc produces linear CSG segments', () => {
+    const result = simulate(
+      makeInput(`
+G90
+T1 M6
+M3 S18000
+G0 X10 Y0 Z-5
+G2 X0 Y10 I-10 J0 F1000
+M5
+M30
+`),
+    )
+    // Arc tessellated into multiple linear segments
+    expect(result.csgRequests.length).toBeGreaterThanOrEqual(2)
+    expect(result.csgRequests.every((r) => r.type === 'mill')).toBe(true)
+    expect(result.csgRequests.every((r) => r.tipType === 'flat-end-mill')).toBe(true)
+  })
+
+  it('G3 arc produces linear CSG segments', () => {
+    const result = simulate(
+      makeInput(`
+G90
+T1 M6
+M3 S18000
+G0 X10 Y0 Z-5
+G3 X0 Y10 I-10 J0 F1000
+M5
+M30
+`),
+    )
+    expect(result.csgRequests.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('arc operations are not produced when spindle is off', () => {
+    const result = simulate(
+      makeInput(`
+G90
+T1 M6
+G0 X10 Y0 Z-5
+G2 X0 Y10 I-10 J0 F1000
+M30
+`),
+    )
+    expect(result.csgRequests).toHaveLength(0)
+  })
+})
+
+// ── Drilling cycle simulation ───────────────────────────────────
+
+describe('simulate — drilling cycles', () => {
+  it('G81 produces drill CSG request', () => {
+    const result = simulate(
+      makeInput(`
+G90
+T2 M6
+M3 S12000
+G81 X50 Y50 Z-15 R2 F300
+M5
+M30
+`),
+    )
+    expect(result.csgRequests).toHaveLength(1)
+    expect(result.csgRequests[0].type).toBe('drill')
+    expect(result.csgRequests[0].toolDiameter).toBe(8)
+    expect(result.csgRequests[0].fromZ).toBe(2)
+    expect(result.csgRequests[0].toZ).toBe(-15)
+  })
+
+  it('G81 modal repeat produces multiple drill requests', () => {
+    const result = simulate(
+      makeInput(`
+G90
+T2 M6
+M3 S12000
+G81 X10 Y10 Z-15 R2 F300
+X20 Y20
+X30 Y30
+G80
+M5
+M30
+`),
+    )
+    expect(result.csgRequests).toHaveLength(3)
+    expect(result.csgRequests.every((r) => r.type === 'drill')).toBe(true)
+    expect(result.csgRequests[0].fromX).toBe(10)
+    expect(result.csgRequests[1].fromX).toBe(20)
+    expect(result.csgRequests[2].fromX).toBe(30)
+  })
+
+  it('G83 peck drill produces single full-depth CSG request', () => {
+    const result = simulate(
+      makeInput(`
+G90
+T2 M6
+M3 S12000
+G83 X50 Y50 Z-15 R2 Q5 F300
+M5
+M30
+`),
+    )
+    expect(result.csgRequests).toHaveLength(1)
+    expect(result.csgRequests[0].type).toBe('drill')
+    expect(result.csgRequests[0].toZ).toBe(-15)
   })
 })

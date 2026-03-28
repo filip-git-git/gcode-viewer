@@ -3,11 +3,12 @@
  */
 
 import type { Operation, ParseResult, WorkpieceDimensions } from '../parser/types'
-import type { ToolDefinition } from '../tools/types'
+import type { ToolDefinition, TipType } from '../tools/types'
 
 /** A CSG operation request for the CSG engine */
 export interface CsgOperationRequest {
   type: 'mill' | 'drill'
+  tipType: TipType
   fromX: number
   fromY: number
   fromZ: number
@@ -18,6 +19,8 @@ export interface CsgOperationRequest {
   toolDiameter: number
   operationIndex: number
   sourceLineNumber: number
+  /** Drill/forstner tip angle in degrees. Passed through from ToolDefinition.tipAngle. */
+  tipAngle?: number
 }
 
 /** Warning produced during simulation */

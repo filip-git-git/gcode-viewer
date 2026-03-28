@@ -24,7 +24,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts', 'src/**/types.ts', 'src/main.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/types.ts',
+        'src/main.ts',
+        'src/csg/manifoldWorker.ts', // WASM Web Worker — requires manifold-3d WASM, untestable in jsdom
+      ],
       thresholds: {
         'src/parser/': {
           lines: 90,

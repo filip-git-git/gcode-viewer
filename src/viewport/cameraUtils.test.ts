@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { calculateCameraPosition, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_TARGET } from './cameraUtils'
+import {
+  calculateCameraPosition,
+  calculatePresetCamera,
+  DEFAULT_CAMERA_POSITION,
+  DEFAULT_CAMERA_TARGET,
+  VIEW_PRESETS,
+  type ViewPreset,
+} from './cameraUtils'
 
 describe('calculateCameraPosition', () => {
   it('centers target on workpiece', () => {
@@ -47,5 +54,71 @@ describe('default camera constants', () => {
   it('has reasonable default target', () => {
     expect(DEFAULT_CAMERA_TARGET.x).toBeGreaterThanOrEqual(0)
     expect(DEFAULT_CAMERA_TARGET.y).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('VIEW_PRESETS', () => {
+  it('has all 7 presets', () => {
+    const presets: ViewPreset[] = ['perspective', 'top', 'bottom', 'front', 'back', 'right', 'left']
+    for (const p of presets) {
+      expect(VIEW_PRESETS[p]).toBeDefined()
+      expect(VIEW_PRESETS[p].label).toBeTruthy()
+      expect(VIEW_PRESETS[p].type).toMatch(/^(perspective|orthographic)$/)
+    }
+  })
+
+  it('perspective is the only perspective type', () => {
+    expect(VIEW_PRESETS.perspective.type).toBe('perspective')
+    const orthos: ViewPreset[] = ['top', 'bottom', 'front', 'back', 'right', 'left']
+    for (const p of orthos) {
+      expect(VIEW_PRESETS[p].type).toBe('orthographic')
+    }
+  })
+})
+
+describe('calculatePresetCamera', () => {
+  const dims = { width: 800, height: 500, thickness: 18 }
+
+  it('perspective preset is not orthographic', () => {
+    const result = calculatePresetCamera('perspective', dims)
+    expect(result.isOrthographic).toBe(false)
+  })
+
+  it('top preset looks down Z axis', () => {
+    const result = calculatePresetCamera('top', dims)
+    expect(result.isOrthographic).toBe(true)
+    // Camera above workpiece
+    expect(result.position.z).toBeGreaterThan(result.target.z)
+    // Camera directly above center (same X/Y as target)
+    expect(result.position.x).toBeCloseTo(result.target.x, 0)
+    expect(result.position.y).toBeCloseTo(result.target.y, 0)
+  })
+
+  it('front preset looks from negative Y', () => {
+    const result = calculatePresetCamera('front', dims)
+    expect(result.isOrthographic).toBe(true)
+    expect(result.position.y).toBeLessThan(result.target.y)
+  })
+
+  it('right preset looks from positive X', () => {
+    const result = calculatePresetCamera('right', dims)
+    expect(result.isOrthographic).toBe(true)
+    expect(result.position.x).toBeGreaterThan(result.target.x)
+  })
+
+  it('all presets center target on workpiece', () => {
+    const presets: ViewPreset[] = ['perspective', 'top', 'bottom', 'front', 'back', 'right', 'left']
+    for (const p of presets) {
+      const result = calculatePresetCamera(p, dims)
+      expect(result.target.x).toBeCloseTo(400, 0)
+      expect(result.target.y).toBeCloseTo(250, 0)
+      expect(result.target.z).toBeCloseTo(-9, 0)
+    }
+  })
+
+  it('orthoSize scales with workpiece dimensions', () => {
+    const small = calculatePresetCamera('top', { width: 100, height: 100, thickness: 18 })
+    const large = calculatePresetCamera('top', { width: 2000, height: 1000, thickness: 18 })
+    expect(large.orthoSize).toBeGreaterThan(small.orthoSize)
   })
 })

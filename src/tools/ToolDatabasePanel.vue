@@ -26,10 +26,33 @@ const deleteConfirm = ref<number | null>(null)
 const TIP_TYPE_LABELS: Record<TipType, string> = {
   'flat-end-mill': 'Flat End Mill',
   'ball-end-mill': 'Ball End Mill',
+  'bull-nose': 'Bull Nose',
   'drill': 'Drill',
+  'forstner': 'Forstner',
 }
 
-const TIP_TYPES: TipType[] = ['flat-end-mill', 'ball-end-mill', 'drill']
+const TIP_TYPES: TipType[] = ['flat-end-mill', 'ball-end-mill', 'bull-nose', 'drill', 'forstner']
+
+/** Whether the current tipType has a configurable tip angle */
+function hasTipAngle(tipType: TipType): boolean {
+  return tipType === 'drill' || tipType === 'forstner'
+}
+
+/** Whether the current tipType has a corner radius */
+function hasCornerRadius(tipType: TipType): boolean {
+  return tipType === 'bull-nose'
+}
+
+function onTipTypeChange(tipType: TipType): void {
+  if (!editingTool.value) return
+  // Set sensible defaults when switching to a type with extra params
+  if (hasTipAngle(tipType) && editingTool.value.tipAngle === undefined) {
+    editingTool.value.tipAngle = 118
+  }
+  if (hasCornerRadius(tipType) && editingTool.value.cornerRadius === undefined) {
+    editingTool.value.cornerRadius = 1
+  }
+}
 
 const sortedTools = computed(() =>
   [...toolStore.tools].sort((a, b) => a.toolNumber - b.toolNumber),
@@ -130,11 +153,33 @@ function resetDefaults(): void {
 
               <label class="tool-panel__field">
                 <span>Tip Type</span>
-                <select v-model="editingTool.tipType">
+                <select v-model="editingTool.tipType" @change="onTipTypeChange(editingTool!.tipType)">
                   <option v-for="tt in TIP_TYPES" :key="tt" :value="tt">
                     {{ TIP_TYPE_LABELS[tt] }}
                   </option>
                 </select>
+              </label>
+
+              <label v-if="hasTipAngle(editingTool.tipType)" class="tool-panel__field">
+                <span>Tip Angle (°)</span>
+                <input
+                  v-model.number="editingTool.tipAngle"
+                  type="number"
+                  min="1"
+                  max="179"
+                  step="1"
+                  placeholder="118"
+                />
+              </label>
+
+              <label v-if="hasCornerRadius(editingTool.tipType)" class="tool-panel__field">
+                <span>Corner Radius (mm)</span>
+                <input
+                  v-model.number="editingTool.cornerRadius"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                />
               </label>
 
               <label class="tool-panel__field">
@@ -387,6 +432,16 @@ function resetDefaults(): void {
 .tool-panel__badge[data-type="drill"] {
   color: #58a6ff;
   border-color: rgba(88, 166, 255, 0.2);
+}
+
+.tool-panel__badge[data-type="forstner"] {
+  color: #79c0ff;
+  border-color: rgba(121, 192, 255, 0.2);
+}
+
+.tool-panel__badge[data-type="bull-nose"] {
+  color: #ffa657;
+  border-color: rgba(255, 166, 87, 0.2);
 }
 
 .tool-panel__btn-delete {

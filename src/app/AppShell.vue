@@ -15,14 +15,16 @@
  *   └──────────────────────────────────┘
  */
 
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import Toolbar from './Toolbar.vue'
 import StatusBar from './StatusBar.vue'
 import SplitPane from './SplitPane.vue'
+import SimulationControls from './SimulationControls.vue'
 import DimensionDialog from './DimensionDialog.vue'
 import EditorPanel from '../editor/EditorPanel.vue'
 import WorkpieceViewport from '../viewport/WorkpieceViewport.vue'
 import ToolDatabasePanel from '../tools/ToolDatabasePanel.vue'
+import VerificationReport from './VerificationReport.vue'
 import { useGCodePipeline } from './useGCodePipeline'
 import type { ParseWarning } from '../parser/types'
 
@@ -32,6 +34,7 @@ const cursorLine = ref(1)
 const cursorCol = ref(1)
 const showToolPanel = ref(false)
 const showDimDialog = ref(false)
+const showVerification = ref(false)
 
 // Combine all warnings for the status bar
 const allWarnings = computed<ParseWarning[]>(() => [
@@ -63,6 +66,9 @@ function onGlobalKeyDown(e: KeyboardEvent): void {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', onGlobalKeyDown)
+  onUnmounted(() => {
+    window.removeEventListener('keydown', onGlobalKeyDown)
+  })
 }
 </script>
 
@@ -76,7 +82,25 @@ if (typeof window !== 'undefined') {
       :csg-time-ms="pipeline.scene.totalCsgTimeMs.value"
       @toggle-tools="showToolPanel = !showToolPanel"
       @open-dimensions="showDimDialog = true"
+      @open-verification="showVerification = true"
       @load-file="handleFileDrop"
+    />
+
+    <SimulationControls
+      :current-step="pipeline.playback.currentStep.value"
+      :total-steps="pipeline.playback.totalSteps.value"
+      :is-playing="pipeline.playback.isPlaying.value"
+      :is-step-mode="pipeline.playback.isStepMode.value"
+      :is-computing="pipeline.playback.isComputing.value"
+      :has-workpiece="pipeline.scene.hasWorkpiece.value"
+      @step-forward="pipeline.playback.stepForward()"
+      @step-back="pipeline.playback.stepBack()"
+      @play="pipeline.playback.play()"
+      @pause="pipeline.playback.pause()"
+      @reset="pipeline.playback.reset()"
+      @enter-step-mode="pipeline.playback.enterStepMode()"
+      @exit-step-mode="pipeline.playback.exitStepMode()"
+      @go-to-step="pipeline.playback.goToStep($event)"
     />
 
     <main class="app-shell__main">
@@ -84,6 +108,7 @@ if (typeof window !== 'undefined') {
         <template #left>
           <EditorPanel
             :model-value="pipeline.gcodeText.value"
+            :highlight-line="pipeline.playback.currentLineNumber.value"
             @update:model-value="pipeline.gcodeText.value = $event"
             @cursor-change="handleCursorChange"
             @file-drop="handleFileDrop"
@@ -119,6 +144,17 @@ if (typeof window !== 'undefined') {
       :current-dimensions="pipeline.dimensions.value"
       @close="showDimDialog = false"
       @apply="pipeline.setManualDimensions"
+    />
+
+    <VerificationReport
+      :open="showVerification"
+      :parse-warnings="pipeline.parseWarnings.value"
+      :sim-warnings="pipeline.simWarnings.value"
+      :dimensions="pipeline.dimensions.value"
+      :operation-count="pipeline.operationCount.value"
+      :tools-used="pipeline.toolsUsed.value"
+      :has-file="!!pipeline.fileName.value"
+      @close="showVerification = false"
     />
   </div>
 </template>

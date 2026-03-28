@@ -34,6 +34,16 @@ export interface ParsedToken {
   value: number
 }
 
+/** Active drilling cycle state (set by G81/G82/G83, cleared by G80) */
+export interface DrillingCycleState {
+  type: 'G81' | 'G82' | 'G83'
+  rPlane: number
+  zDepth: number
+  feedRate: number
+  dwellMs?: number
+  peckDepth?: number
+}
+
 /** Machine state tracked across parsed lines */
 export interface MachineState {
   motionMode: MotionMode
@@ -45,6 +55,7 @@ export interface MachineState {
   spindleState: SpindleState
   spindleSpeed: number
   activeTool: number
+  activeDrillingCycle?: DrillingCycleState
 }
 
 /** Initial machine state */
@@ -74,6 +85,11 @@ export interface Operation {
   spindleState: SpindleState
   spindleSpeed: number
   lineNumber: number
+  /** Arc center offset from start position (I = X offset, J = Y offset) */
+  centerI?: number
+  centerJ?: number
+  /** Arc radius (R-form specification, alternative to I/J) */
+  radius?: number
 }
 
 /** A warning produced during parsing */

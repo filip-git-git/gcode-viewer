@@ -33,6 +33,7 @@ vi.stubGlobal(
 function makeDrillOp(overrides: Partial<CsgOperationRequest> = {}): CsgOperationRequest {
   return {
     type: 'drill',
+    tipType: 'drill',
     fromX: 50,
     fromY: 50,
     fromZ: 0,
@@ -143,5 +144,111 @@ describe('CSGEngine interface compliance', () => {
     expect(typeof asEngine.subtractBatch).toBe('function')
     expect(typeof asEngine.dispose).toBe('function')
     expect(typeof asEngine.subtractBatchAsync).toBe('function')
+  })
+})
+
+describe('worker message handling', () => {
+  it('subtractBatchAsync sends correct message to worker', async () => {
+    const eng = new ManifoldCsgEngine()
+    const geo = eng.createWorkpiece(400, 300, 18)
+    const ops = [makeDrillOp()]
+
+    // Start the async call (will wait for worker response)
+    const promise = eng.subtractBatchAsync(geo, ops)
+
+    // Verify postMessage was called with correct data
+    const worker = (eng as any).worker
+    expect(worker.postMessage).toHaveBeenCalledTimes(1)
+    const msg = worker.postMessage.mock.calls[0][0]
+    expect(msg.type).toBe('subtractBatch')
+    expect(msg.workpieceDims).toEqual({ width: 400, height: 300, thickness: 18 })
+    expect(msg.operations).toEqual(ops)
+    expect(typeof msg.id).toBe('number')
+
+    // Simulate worker response to resolve the promise
+    const responseGeo = {
+      position: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      index: new Uint32Array([0, 1, 2]),
+      groups: [{ start: 0, count: 3, materialIndex: 0 }],
+    }
+    worker.onmessage({
+      data: { id: msg.id, geometry: responseGeo, elapsedMs: 42 },
+    })
+
+    const result = await promise
+    expect(result.elapsedMs).toBe(42)
+    expect(result.geometry).toBeDefined()
+    eng.terminate()
+  })
+
+  it('handles worker error response', async () => {
+    const eng = new ManifoldCsgEngine()
+    eng.createWorkpiece(100, 100, 18)
+    const ops = [makeDrillOp()]
+
+    const promise = eng.subtractBatchAsync(eng.createWorkpiece(100, 100, 18), ops)
+
+    const worker = (eng as any).worker
+    const msg = worker.postMessage.mock.calls[0][0]
+
+    // Simulate worker error response
+    worker.onmessage({
+      data: { id: msg.id, error: 'WASM crash' },
+    })
+
+    await expect(promise).rejects.toThrow('WASM crash')
+    eng.terminate()
+  })
+
+  it('handles worker onerror event', async () => {
+    const eng = new ManifoldCsgEngine()
+    eng.createWorkpiece(100, 100, 18)
+    const ops = [makeDrillOp()]
+
+    const promise = eng.subtractBatchAsync(eng.createWorkpiece(100, 100, 18), ops)
+
+    const worker = (eng as any).worker
+
+    // Simulate onerror
+    worker.onerror({ message: 'Worker died' } as ErrorEvent)
+
+    await expect(promise).rejects.toThrow('Manifold Worker error')
+    eng.terminate()
+  })
+
+  it('assigns sequential message IDs', async () => {
+    const eng = new ManifoldCsgEngine()
+    eng.createWorkpiece(100, 100, 18)
+    const ops = [makeDrillOp()]
+
+    // Fire two requests
+    eng.subtractBatchAsync(eng.createWorkpiece(100, 100, 18), ops).catch(() => {})
+    eng.subtractBatchAsync(eng.createWorkpiece(100, 100, 18), ops).catch(() => {})
+
+    const worker = (eng as any).worker
+    const id0 = worker.postMessage.mock.calls[0][0].id
+    const id1 = worker.postMessage.mock.calls[1][0].id
+    expect(id1).toBe(id0 + 1)
+    eng.terminate()
+  })
+})
+
+describe('createWorkpiece geometry details', () => {
+  it('creates geometry with material groups', () => {
+    const geo = engine.createWorkpiece(200, 100, 18)
+    // BoxGeometry has 6 groups by default (one per face)
+    expect(geo.groups.length).toBe(6)
+  })
+
+  it('creates different workpiece sizes', () => {
+    const small = engine.createWorkpiece(100, 50, 10)
+    const large = engine.createWorkpiece(1000, 800, 36)
+
+    small.computeBoundingBox()
+    large.computeBoundingBox()
+
+    expect(small.boundingBox!.max.x - small.boundingBox!.min.x).toBeCloseTo(100, 0)
+    expect(large.boundingBox!.max.x - large.boundingBox!.min.x).toBeCloseTo(1000, 0)
+    expect(large.boundingBox!.max.z - large.boundingBox!.min.z).toBeCloseTo(36, 0)
   })
 })

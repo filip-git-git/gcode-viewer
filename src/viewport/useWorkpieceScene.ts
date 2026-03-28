@@ -29,10 +29,13 @@ export interface WorkpieceSceneState {
 
   /** Create a fresh workpiece from dimensions */
   createWorkpiece(dimensions: WorkpieceDimensions): void
-  /** Apply a single CSG operation to the current workpiece */
-  applyOperation(operation: CsgOperationRequest): void
   /** Apply all CSG operations — uses async worker if available */
   applyAllOperations(operations: CsgOperationRequest[], signal?: AbortSignal): Promise<void>
+  /**
+   * Compute workpiece from scratch (create + subtract) with a single atomic geometry swap.
+   * No intermediate bare-box flash — geometry only updates once, when the result is ready.
+   */
+  recomputeWorkpiece(dimensions: WorkpieceDimensions, operations: CsgOperationRequest[], signal?: AbortSignal): Promise<void>
   /** Reset — dispose current workpiece */
   reset(): void
 }
@@ -70,16 +73,6 @@ export function useWorkpieceScene(engine: CSGEngine): WorkpieceSceneState {
     hasWorkpiece.value = true
   }
 
-  function applyOperation(operation: CsgOperationRequest): void {
-    if (!geometry.value) return
-
-    const result = engine.subtract(geometry.value, operation)
-    engine.dispose(geometry.value)
-    geometry.value = result.geometry
-    operationsApplied.value++
-    totalCsgTimeMs.value += result.elapsedMs
-  }
-
   async function applyAllOperations(operations: CsgOperationRequest[], signal?: AbortSignal): Promise<void> {
     if (!geometry.value || operations.length === 0) return
     if (signal?.aborted) return
@@ -100,6 +93,58 @@ export function useWorkpieceScene(engine: CSGEngine): WorkpieceSceneState {
       operationsApplied.value += operations.length
       totalCsgTimeMs.value += result.elapsedMs
     }
+  }
+
+  async function recomputeWorkpiece(
+    dimensions: WorkpieceDimensions,
+    operations: CsgOperationRequest[],
+    signal?: AbortSignal,
+  ): Promise<void> {
+    if (signal?.aborted) return
+
+    // createWorkpiece sets lastWorkpieceDims in the engine (needed by the worker)
+    // but we do NOT assign it to geometry.value yet — no re-render until result is ready
+    const freshGeo = engine.createWorkpiece(dimensions.width, dimensions.height, dimensions.thickness)
+
+    if (operations.length === 0) {
+      // BoxGeometry has 6 groups (one per face, materialIndex 0-5).
+      // With a 2-material array only indices 0-1 exist — faces 2-5 are invisible.
+      // clearGroups() makes it worse: empty groups array = zero draw calls = nothing renders.
+      // Fix: remap all groups to materialIndex 0 (surface laminate) so all faces render.
+      for (const group of freshGeo.groups) {
+        group.materialIndex = 0
+      }
+      if (geometry.value) engine.dispose(geometry.value)
+      geometry.value = freshGeo
+      hasWorkpiece.value = true
+      operationsApplied.value = 0
+      totalCsgTimeMs.value = 0
+      return
+    }
+
+    // Compute CSG off-thread, then do a single swap
+    let result: { geometry: BufferGeometry; elapsedMs: number }
+    if (engine.subtractBatchAsync) {
+      result = await engine.subtractBatchAsync(freshGeo, operations)
+    } else {
+      result = engine.subtractBatch(freshGeo, operations)
+    }
+
+    if (signal?.aborted) {
+      engine.dispose(freshGeo)
+      engine.dispose(result.geometry)
+      return
+    }
+
+    // freshGeo was only used to set lastWorkpieceDims — dispose it now
+    engine.dispose(freshGeo)
+
+    // Single atomic swap — geometry.value changes exactly once
+    if (geometry.value) engine.dispose(geometry.value)
+    geometry.value = result.geometry
+    hasWorkpiece.value = true
+    operationsApplied.value = operations.length
+    totalCsgTimeMs.value = result.elapsedMs
   }
 
   function reset(): void {
@@ -125,8 +170,8 @@ export function useWorkpieceScene(engine: CSGEngine): WorkpieceSceneState {
     operationsApplied,
     totalCsgTimeMs,
     createWorkpiece,
-    applyOperation,
     applyAllOperations,
+    recomputeWorkpiece,
     reset,
   }
 }

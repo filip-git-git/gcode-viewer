@@ -51,6 +51,7 @@ function createSimpleMockEngine(): CSGEngine & { disposeCallCount: number; dispo
 function makeOp(index: number): CsgOperationRequest {
   return {
     type: 'mill',
+    tipType: 'flat-end-mill',
     fromX: 10,
     fromY: 10,
     fromZ: 0,
@@ -98,31 +99,6 @@ describe('useWorkpieceScene', () => {
     expect(engine.disposed).toContain(firstGeo)
   })
 
-  it('disposes old geometry on each CSG operation (dispose before replace)', () => {
-    const scene = useWorkpieceScene(engine)
-    scene.createWorkpiece({ width: 200, height: 200, thickness: 18 })
-    const initialGeo = scene.geometry.value
-
-    scene.applyOperation(makeOp(0))
-
-    // Initial geometry should have been disposed
-    expect(engine.disposed).toContain(initialGeo)
-    // New geometry should be different from initial
-    expect(scene.geometry.value).not.toBe(initialGeo)
-  })
-
-  it('tracks operation count and CSG time', () => {
-    const scene = useWorkpieceScene(engine)
-    scene.createWorkpiece({ width: 200, height: 200, thickness: 18 })
-
-    scene.applyOperation(makeOp(0))
-    scene.applyOperation(makeOp(1))
-    scene.applyOperation(makeOp(2))
-
-    expect(scene.operationsApplied.value).toBe(3)
-    expect(scene.totalCsgTimeMs.value).toBe(15) // 3 * 5ms mock
-  })
-
   it('applyAllOperations applies in batches with disposal', async () => {
     const scene = useWorkpieceScene(engine)
     scene.createWorkpiece({ width: 200, height: 200, thickness: 18 })
@@ -138,7 +114,6 @@ describe('useWorkpieceScene', () => {
   it('reset disposes geometry and clears state', () => {
     const scene = useWorkpieceScene(engine)
     scene.createWorkpiece({ width: 200, height: 200, thickness: 18 })
-    scene.applyOperation(makeOp(0))
 
     const currentGeo = scene.geometry.value
     scene.reset()
@@ -150,30 +125,10 @@ describe('useWorkpieceScene', () => {
     expect(scene.totalCsgTimeMs.value).toBe(0)
   })
 
-  it('does not crash when applying operation without workpiece', () => {
-    const scene = useWorkpieceScene(engine)
-    expect(() => scene.applyOperation(makeOp(0))).not.toThrow()
-    expect(scene.operationsApplied.value).toBe(0)
-  })
-
   it('does not crash on double reset', () => {
     const scene = useWorkpieceScene(engine)
     scene.createWorkpiece({ width: 200, height: 200, thickness: 18 })
     scene.reset()
     expect(() => scene.reset()).not.toThrow()
-  })
-
-  it('no monotonic heap growth pattern — disposes on every replace', () => {
-    const scene = useWorkpieceScene(engine)
-    scene.createWorkpiece({ width: 200, height: 200, thickness: 18 })
-
-    // Apply 20 operations
-    for (let i = 0; i < 20; i++) {
-      scene.applyOperation(makeOp(i))
-    }
-
-    // Should have disposed 20 geometries (one per replace)
-    expect(engine.disposeCallCount).toBe(20)
-    expect(scene.operationsApplied.value).toBe(20)
   })
 })

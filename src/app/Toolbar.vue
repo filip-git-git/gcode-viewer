@@ -19,6 +19,7 @@ defineProps<{
 const emit = defineEmits<{
   toggleTools: []
   openDimensions: []
+  openVerification: []
   loadFile: [name: string, content: string]
 }>()
 
@@ -104,6 +105,17 @@ function formatTime(ms: number): string {
             <path d="M1 3.5A1.5 1.5 0 012.5 2h11A1.5 1.5 0 0115 3.5v9a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5v-9zM3 5v6h10V5H3z" />
           </svg>
           <span>Dimensions</span>
+        </button>
+
+        <button
+          class="toolbar__btn"
+          title="Verify program"
+          @click="$emit('openVerification')"
+        >
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+            <path d="M8 1a.75.75 0 01.54.23l5.25 5.5a.75.75 0 01-.02 1.06l-5.25 5a.75.75 0 01-1.06-.04l-3-3.25a.75.75 0 111.1-1.02L8 10.94l4.72-4.5L8 2.06 3.28 6.44l1.22 1.16a.75.75 0 11-1.02 1.1l-1.75-1.67a.75.75 0 01.02-1.06l5.71-5.44A.75.75 0 018 1z" />
+          </svg>
+          <span>Verify</span>
         </button>
       </div>
     </div>

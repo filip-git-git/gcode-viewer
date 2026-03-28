@@ -4,8 +4,8 @@
  */
 
 import { ref, shallowRef, watch, onMounted, onUnmounted } from 'vue'
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view'
-import { EditorState, type Extension } from '@codemirror/state'
+import { EditorView, Decoration, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view'
+import { EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { syntaxHighlighting, HighlightStyle, bracketMatching } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
@@ -13,6 +13,7 @@ import { gcodeLanguage } from './gcodeLanguage'
 
 const props = defineProps<{
   modelValue: string
+  highlightLine?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -25,6 +26,28 @@ const editorContainer = ref<HTMLElement | null>(null)
 const editorView = shallowRef<EditorView | null>(null)
 const isUpdatingFromProp = ref(false)
 const isDragOver = ref(false)
+
+// ── Simulation line highlight ────────────────────────────────────
+const setHighlightLine = StateEffect.define<number | null>()
+
+const simLineDecoration = Decoration.line({ class: 'cm-simHighlightLine' })
+
+const highlightLineField = StateField.define({
+  create() { return Decoration.none },
+  update(decorations, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setHighlightLine)) {
+        if (effect.value === null) return Decoration.none
+        const lineNum = effect.value
+        if (lineNum < 1 || lineNum > tr.state.doc.lines) return Decoration.none
+        const line = tr.state.doc.line(lineNum)
+        return Decoration.set([simLineDecoration.range(line.from)])
+      }
+    }
+    return decorations
+  },
+  provide: (f) => EditorView.decorations.from(f),
+})
 
 const gcodeTheme = EditorView.theme({
   '&': {
@@ -77,6 +100,10 @@ const gcodeTheme = EditorView.theme({
     backgroundColor: 'rgba(232, 168, 56, 0.2)',
     outline: '1px solid rgba(232, 168, 56, 0.4)',
   },
+  '.cm-simHighlightLine': {
+    backgroundColor: 'rgba(126, 231, 135, 0.12) !important',
+    borderLeft: '3px solid #7ee787',
+  },
 }, { dark: true })
 
 const gcodeHighlighting = syntaxHighlighting(
@@ -115,6 +142,7 @@ function createExtensions(): Extension[] {
     history(),
     keymap.of([...defaultKeymap, ...historyKeymap]),
     cursorListener,
+    highlightLineField,
     EditorView.lineWrapping,
     EditorState.tabSize.of(2),
   ]
@@ -150,6 +178,23 @@ watch(
       },
     })
     isUpdatingFromProp.value = false
+  },
+)
+
+watch(
+  () => props.highlightLine,
+  (lineNum) => {
+    if (!editorView.value) return
+    editorView.value.dispatch({
+      effects: setHighlightLine.of(lineNum ?? null),
+    })
+    // Scroll highlighted line into view
+    if (lineNum && lineNum >= 1 && lineNum <= editorView.value.state.doc.lines) {
+      const line = editorView.value.state.doc.line(lineNum)
+      editorView.value.dispatch({
+        effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
+      })
+    }
   },
 )
 

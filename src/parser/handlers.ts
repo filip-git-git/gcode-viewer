@@ -10,6 +10,7 @@ import type {
   MachineState,
   Operation,
   MotionMode,
+  DrillingCycleState,
 } from './types'
 
 export interface HandlerResult {
@@ -99,6 +100,125 @@ function handleMotion(
   return { operations: [op], nextState }
 }
 
+// ── Arc handler ─────────────────────────────────────────────────
+
+function handleArc(
+  mode: MotionMode,
+  type: 'arc-cw' | 'arc-ccw',
+  tokens: ParsedToken[],
+  state: MachineState,
+  lineNumber: number,
+): HandlerResult {
+  const newFeed = findValue(tokens, 'F')
+  const feed = newFeed ?? state.feedRate
+
+  const i = findValue(tokens, 'I')
+  const j = findValue(tokens, 'J')
+  const r = findValue(tokens, 'R')
+
+  let toX: number, toY: number, toZ: number
+
+  if (state.positioningMode === 'G91') {
+    toX = state.x + (findValue(tokens, 'X') ?? 0)
+    toY = state.y + (findValue(tokens, 'Y') ?? 0)
+    toZ = state.z + (findValue(tokens, 'Z') ?? 0)
+  } else {
+    toX = findValue(tokens, 'X') ?? state.x
+    toY = findValue(tokens, 'Y') ?? state.y
+    toZ = findValue(tokens, 'Z') ?? state.z
+  }
+
+  const nextState: MachineState = {
+    ...state,
+    motionMode: mode,
+    x: toX,
+    y: toY,
+    z: toZ,
+    feedRate: feed,
+  }
+
+  const op: Operation = {
+    type,
+    fromX: state.x,
+    fromY: state.y,
+    fromZ: state.z,
+    toX,
+    toY,
+    toZ,
+    feedRate: feed,
+    toolNumber: state.activeTool,
+    spindleState: state.spindleState,
+    spindleSpeed: state.spindleSpeed,
+    lineNumber,
+  }
+
+  // Attach arc parameters
+  if (i !== undefined || j !== undefined) {
+    op.centerI = i ?? 0
+    op.centerJ = j ?? 0
+  } else if (r !== undefined) {
+    op.radius = r
+  }
+
+  return { operations: [op], nextState }
+}
+
+// ── Drilling cycle handlers ─────────────────────────────────────
+
+function handleDrillingCycle(
+  cycleType: DrillingCycleState['type'],
+  tokens: ParsedToken[],
+  state: MachineState,
+  lineNumber: number,
+): HandlerResult {
+  const x = findValue(tokens, 'X') ?? state.x
+  const y = findValue(tokens, 'Y') ?? state.y
+  const z = findValue(tokens, 'Z')
+  const r = findValue(tokens, 'R')
+  const f = findValue(tokens, 'F') ?? state.feedRate
+  const p = findValue(tokens, 'P')
+  const q = findValue(tokens, 'Q')
+
+  const rPlane = r ?? state.activeDrillingCycle?.rPlane ?? state.z
+  const zDepth = z ?? state.activeDrillingCycle?.zDepth ?? state.z
+
+  const cycle: DrillingCycleState = {
+    type: cycleType,
+    rPlane,
+    zDepth,
+    feedRate: f,
+    ...(p !== undefined && { dwellMs: p }),
+    ...(q !== undefined && { peckDepth: q }),
+  }
+
+  const nextState: MachineState = {
+    ...state,
+    x,
+    y,
+    z: rPlane,
+    feedRate: f,
+    activeDrillingCycle: cycle,
+  }
+
+  // Drill plunge operation: from R plane down to Z depth
+  const op: Operation = {
+    type: 'linear',
+    fromX: x,
+    fromY: y,
+    fromZ: rPlane,
+    toX: x,
+    toY: y,
+    toZ: zDepth,
+    feedRate: f,
+    toolNumber: state.activeTool,
+    spindleState: state.spindleState,
+    spindleSpeed: state.spindleSpeed,
+    lineNumber,
+  }
+
+  return { operations: [op], nextState }
+}
+
 // ── Handler registry ─────────────────────────────────────────────
 
 const gCodeHandlers = new Map<number, CommandHandler>()
@@ -112,6 +232,16 @@ gCodeHandlers.set(0, (tokens, state, ln) =>
 // G1 — Linear interpolation
 gCodeHandlers.set(1, (tokens, state, ln) =>
   handleMotion('G1', 'linear', tokens, state, ln),
+)
+
+// G2 — Clockwise arc interpolation
+gCodeHandlers.set(2, (tokens, state, ln) =>
+  handleArc('G2', 'arc-cw', tokens, state, ln),
+)
+
+// G3 — Counter-clockwise arc interpolation
+gCodeHandlers.set(3, (tokens, state, ln) =>
+  handleArc('G3', 'arc-ccw', tokens, state, ln),
 )
 
 // G17 — XY plane select (default, no-op for now)
@@ -137,6 +267,27 @@ gCodeHandlers.set(90, (_tokens, state) => ({
   operations: [],
   nextState: { ...state, positioningMode: 'G90' },
 }))
+
+// G80 — Cancel drilling cycle
+gCodeHandlers.set(80, (_tokens, state) => ({
+  operations: [],
+  nextState: { ...state, activeDrillingCycle: undefined },
+}))
+
+// G81 — Simple drilling cycle
+gCodeHandlers.set(81, (tokens, state, ln) =>
+  handleDrillingCycle('G81', tokens, state, ln),
+)
+
+// G82 — Drilling cycle with dwell
+gCodeHandlers.set(82, (tokens, state, ln) =>
+  handleDrillingCycle('G82', tokens, state, ln),
+)
+
+// G83 — Peck drilling cycle
+gCodeHandlers.set(83, (tokens, state, ln) =>
+  handleDrillingCycle('G83', tokens, state, ln),
+)
 
 // G91 — Incremental positioning
 gCodeHandlers.set(91, (_tokens, state) => ({

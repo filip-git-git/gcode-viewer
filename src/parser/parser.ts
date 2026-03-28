@@ -140,25 +140,42 @@ function processTokens(
   }
 
   // If no G code on this line but there are X/Y/Z/F coordinates,
-  // apply the current motion mode (modal behavior)
+  // check for active drilling cycle first, then fall back to motion mode
   if (
     gCodes.length === 0 &&
     mCodes.length === 0 &&
     tokens.some((t) => 'XYZF'.includes(t.letter))
   ) {
-    const motionCode =
-      currentState.motionMode === 'G0'
-        ? 0
-        : currentState.motionMode === 'G1'
-          ? 1
-          : currentState.motionMode === 'G2'
-            ? 2
-            : 3
-    const handler = gCodeHandlers.get(motionCode)
-    if (handler) {
-      const result = handler(tokens, currentState, lineNumber)
-      currentState = result.nextState
-      ops.push(...result.operations)
+    if (currentState.activeDrillingCycle) {
+      // Modal drilling cycle repeat at new position
+      const cycleCode =
+        currentState.activeDrillingCycle.type === 'G81'
+          ? 81
+          : currentState.activeDrillingCycle.type === 'G82'
+            ? 82
+            : 83
+      const handler = gCodeHandlers.get(cycleCode)
+      if (handler) {
+        const result = handler(tokens, currentState, lineNumber)
+        currentState = result.nextState
+        ops.push(...result.operations)
+      }
+    } else {
+      // Standard modal motion (G0/G1/G2/G3)
+      const motionCode =
+        currentState.motionMode === 'G0'
+          ? 0
+          : currentState.motionMode === 'G1'
+            ? 1
+            : currentState.motionMode === 'G2'
+              ? 2
+              : 3
+      const handler = gCodeHandlers.get(motionCode)
+      if (handler) {
+        const result = handler(tokens, currentState, lineNumber)
+        currentState = result.nextState
+        ops.push(...result.operations)
+      }
     }
   }
 

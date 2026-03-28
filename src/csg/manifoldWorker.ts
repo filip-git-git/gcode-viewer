@@ -72,12 +72,11 @@ async function getWasm(): Promise<any> {
 // ── Native Manifold tool sweep creation ───────────────────────────────────
 
 /**
- * Create a tool sweep volume using native Manifold primitives.
+ * Create a flat end mill sweep volume.
  * Vertical plunge → cylinder. Lateral move → convex hull of two cylinders.
- * Caller must call .delete() on the returned Manifold when done.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function createToolManifold(wasm: any, op: CsgOperationRequest): any {
+function createFlatEndMillManifold(wasm: any, op: CsgOperationRequest): any {
   const { Manifold } = wasm
   const radius = op.toolDiameter / 2
 
@@ -86,7 +85,6 @@ function createToolManifold(wasm: any, op: CsgOperationRequest): any {
   const lateralDist = Math.sqrt(dx * dx + dy * dy)
 
   if (lateralDist < 0.001) {
-    // Vertical plunge — single cylinder along Z
     const zBottom = Math.min(op.fromZ, op.toZ)
     const zTop = Math.max(op.fromZ, op.toZ) + TOOL_CLEARANCE
     const height = zTop - zBottom
@@ -94,10 +92,6 @@ function createToolManifold(wasm: any, op: CsgOperationRequest): any {
       .translate([op.fromX, op.fromY, zBottom])
   }
 
-  // Lateral move — hull of two cylinders, each at its own Z position.
-  // Each cylinder extends from its tip (fromZ or toZ) up to TOOL_CLEARANCE
-  // above the surface (Z=0). For ramp milling (fromZ ≠ toZ), the hull
-  // produces a correctly sloped cut — shallow at one end, deep at the other.
   const topZ = TOOL_CLEARANCE
   const h1 = topZ - op.fromZ
   const h2 = topZ - op.toZ
@@ -111,6 +105,135 @@ function createToolManifold(wasm: any, op: CsgOperationRequest): any {
   cyl1.delete()
   cyl2.delete()
   return result
+}
+
+/**
+ * Create a drill bit sweep volume.
+ * Cylinder body + conical tip.
+ * Point angle from op.tipAngle (degrees), defaults to 118° standard.
+ * Drills are vertical-only operations (no lateral hull).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createDrillManifold(wasm: any, op: CsgOperationRequest): any {
+  const { Manifold } = wasm
+  const radius = op.toolDiameter / 2
+
+  // Point angle (full angle at tip) → half-angle → tip height
+  const pointAngle = op.tipAngle ?? 118
+  const halfAngleDeg = pointAngle / 2
+  const tipHeight = radius / Math.tan((halfAngleDeg * Math.PI) / 180)
+
+  const zBottom = Math.min(op.fromZ, op.toZ)
+  const zTop = Math.max(op.fromZ, op.toZ) + TOOL_CLEARANCE
+
+  // Conical tip: cylinder with top radius = radius, bottom radius = 0
+  const cone = Manifold.cylinder(tipHeight, 0, radius, RADIAL_SEGMENTS)
+    .translate([op.fromX, op.fromY, zBottom - tipHeight])
+
+  // Cylinder body from zBottom to zTop
+  const bodyHeight = zTop - zBottom
+  const body = Manifold.cylinder(bodyHeight, radius, radius, RADIAL_SEGMENTS)
+    .translate([op.fromX, op.fromY, zBottom])
+
+  const result = Manifold.union([cone, body])
+  cone.delete()
+  body.delete()
+  return result
+}
+
+/**
+ * Create a Forstner bit sweep volume.
+ * Flat-bottomed cylinder — no conical tip.
+ * Used for shelf-pin holes, hinge pockets, and other flat-bottom bores.
+ * Forstner bits are vertical-only operations (no lateral hull).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createForstnerManifold(wasm: any, op: CsgOperationRequest): any {
+  const { Manifold } = wasm
+  const radius = op.toolDiameter / 2
+
+  const zBottom = Math.min(op.fromZ, op.toZ)
+  const zTop = Math.max(op.fromZ, op.toZ) + TOOL_CLEARANCE
+  const height = zTop - zBottom
+
+  return Manifold.cylinder(height, radius, radius, RADIAL_SEGMENTS)
+    .translate([op.fromX, op.fromY, zBottom])
+}
+
+/**
+ * Create a ball end mill sweep volume.
+ * Hemisphere cap + cylinder body.
+ * Vertical plunge → sphere cap + cylinder.
+ * Lateral move → hull of two sphere-capped profiles.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createBallEndMillManifold(wasm: any, op: CsgOperationRequest): any {
+  const { Manifold } = wasm
+  const radius = op.toolDiameter / 2
+
+  const dx = op.toX - op.fromX
+  const dy = op.toY - op.fromY
+  const lateralDist = Math.sqrt(dx * dx + dy * dy)
+
+  // Helper: create a ball-end profile at position (x, y, z)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function ballProfile(x: number, y: number, z: number): any {
+    const zTop = TOOL_CLEARANCE
+    const bodyHeight = zTop - z - radius // cylinder from sphere center to top
+    // Hemisphere: sphere intersected with upper half-space
+    const sphere = Manifold.sphere(radius, RADIAL_SEGMENTS || 24)
+      .translate([x, y, z + radius])
+
+    if (bodyHeight <= 0) {
+      return sphere
+    }
+
+    const body = Manifold.cylinder(bodyHeight, radius, radius, RADIAL_SEGMENTS)
+      .translate([x, y, z + radius])
+
+    const result = Manifold.union([sphere, body])
+    sphere.delete()
+    body.delete()
+    return result
+  }
+
+  if (lateralDist < 0.001) {
+    // Vertical plunge
+    const z = Math.min(op.fromZ, op.toZ)
+    return ballProfile(op.fromX, op.fromY, z)
+  }
+
+  // Lateral move — hull of two ball-end profiles
+  const prof1 = ballProfile(op.fromX, op.fromY, op.fromZ)
+  const prof2 = ballProfile(op.toX, op.toY, op.toZ)
+  const result = Manifold.hull([prof1, prof2])
+  prof1.delete()
+  prof2.delete()
+  return result
+}
+
+/**
+ * Create a tool sweep volume using native Manifold primitives.
+ * Dispatches to the appropriate geometry builder based on tipType.
+ * Caller must call .delete() on the returned Manifold when done.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createToolManifold(wasm: any, op: CsgOperationRequest): any {
+  switch (op.tipType) {
+    case 'drill':
+      return createDrillManifold(wasm, op)
+    case 'forstner':
+      return createForstnerManifold(wasm, op)
+    case 'ball-end-mill':
+      return createBallEndMillManifold(wasm, op)
+    case 'bull-nose':
+      // cornerRadius affects surface finish, not bulk material removal.
+      // Geometry identical to flat-end-mill for CSG purposes.
+      return createFlatEndMillManifold(wasm, op)
+    case 'flat-end-mill':
+    default:
+      return createFlatEndMillManifold(wasm, op)
+  }
 }
 
 // ── Core CSG operation ─────────────────────────────────────────────────────
@@ -199,10 +322,10 @@ self.onmessage = async (e: MessageEvent<ManifoldWorkerRequest>) => {
     const transfer: Transferable[] = [geometry.position.buffer]
     if (geometry.index) transfer.push(geometry.index.buffer)
 
-    ;(self as unknown as Worker).postMessage(response, transfer)
+    self.postMessage(response, { transfer })
   } catch (err) {
     console.error('[Manifold Worker] Error:', err)
-    ;(self as unknown as Worker).postMessage({
+    self.postMessage({
       id,
       error: err instanceof Error ? err.message : String(err),
     })

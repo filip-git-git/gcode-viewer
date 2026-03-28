@@ -532,3 +532,247 @@ G0 X10`
     expect(toolOp!.toolNumber).toBe(3)
   })
 })
+
+// ── G2/G3 Arc Interpolation ────────────────────────────────────
+
+describe('G2/G3 arc interpolation', () => {
+  it('G2 with IJ form emits arc-cw operation with center offsets', () => {
+    const input = `G90
+M3 S18000
+G0 X10 Y0
+G2 X0 Y10 I0 J10 F1000`
+    const result = parseGCode(input)
+    const arcs = result.operations.filter((op) => op.type === 'arc-cw')
+    expect(arcs).toHaveLength(1)
+    expect(arcs[0].centerI).toBe(0)
+    expect(arcs[0].centerJ).toBe(10)
+    expect(arcs[0].fromX).toBe(10)
+    expect(arcs[0].fromY).toBe(0)
+    expect(arcs[0].toX).toBe(0)
+    expect(arcs[0].toY).toBe(10)
+  })
+
+  it('G3 with IJ form emits arc-ccw operation', () => {
+    const input = `G90
+M3 S18000
+G0 X10 Y0
+G3 X0 Y10 I0 J10 F1000`
+    const result = parseGCode(input)
+    const arcs = result.operations.filter((op) => op.type === 'arc-ccw')
+    expect(arcs).toHaveLength(1)
+    expect(arcs[0].centerI).toBe(0)
+    expect(arcs[0].centerJ).toBe(10)
+  })
+
+  it('G2 with R form emits arc-cw with radius', () => {
+    const input = `G90
+M3 S18000
+G0 X0 Y0
+G2 X10 Y10 R10 F1000`
+    const result = parseGCode(input)
+    const arcs = result.operations.filter((op) => op.type === 'arc-cw')
+    expect(arcs).toHaveLength(1)
+    expect(arcs[0].radius).toBe(10)
+    expect(arcs[0].centerI).toBeUndefined()
+    expect(arcs[0].centerJ).toBeUndefined()
+  })
+
+  it('G2/G3 updates machine state position', () => {
+    const input = `G90
+G0 X10 Y0
+G2 X0 Y10 I0 J10 F1000`
+    const result = parseGCode(input)
+    expect(result.finalState.x).toBe(0)
+    expect(result.finalState.y).toBe(10)
+    expect(result.finalState.motionMode).toBe('G2')
+  })
+
+  it('G2/G3 sets feed rate', () => {
+    const input = `G0 X10 Y0
+G2 X0 Y10 I0 J10 F2500`
+    const result = parseGCode(input)
+    expect(result.finalState.feedRate).toBe(2500)
+  })
+
+  it('arc mode is modal — subsequent XY uses arc mode', () => {
+    const input = `G90
+M3 S18000
+G0 X10 Y0
+G2 X0 Y10 I0 J10 F1000
+X10 Y0 I10 J0`
+    const result = parseGCode(input)
+    const arcs = result.operations.filter((op) => op.type === 'arc-cw')
+    expect(arcs).toHaveLength(2)
+    expect(arcs[1].fromX).toBe(0)
+    expect(arcs[1].fromY).toBe(10)
+    expect(arcs[1].toX).toBe(10)
+    expect(arcs[1].toY).toBe(0)
+  })
+
+  it('G2/G3 with missing I and J defaults to 0', () => {
+    const input = `G0 X10 Y0
+G2 X0 Y10 I0 F1000`
+    const result = parseGCode(input)
+    const arcs = result.operations.filter((op) => op.type === 'arc-cw')
+    expect(arcs).toHaveLength(1)
+    expect(arcs[0].centerI).toBe(0)
+    expect(arcs[0].centerJ).toBe(0)
+  })
+
+  it('G2/G3 preserves Z during XY arc', () => {
+    const input = `G0 X10 Y0 Z-5
+G2 X0 Y10 I0 J10 F1000`
+    const result = parseGCode(input)
+    const arcs = result.operations.filter((op) => op.type === 'arc-cw')
+    expect(arcs[0].fromZ).toBe(-5)
+    expect(arcs[0].toZ).toBe(-5)
+  })
+
+  it('produces no warnings for valid arc', () => {
+    const input = `G0 X10 Y0
+G2 X0 Y10 I0 J10 F1000`
+    const result = parseGCode(input)
+    expect(result.warnings).toHaveLength(0)
+  })
+})
+
+// ── G81/G82/G83 Drilling Cycles ────────────────────────────────
+
+describe('G81 drilling cycle', () => {
+  it('G81 produces linear drill operation', () => {
+    const input = `G90
+T1 M6
+M3 S18000
+G81 X10 Y10 Z-15 R2 F300`
+    const result = parseGCode(input)
+    const drills = result.operations.filter(
+      (op) => op.type === 'linear' && op.toZ < op.fromZ,
+    )
+    expect(drills).toHaveLength(1)
+    expect(drills[0].fromX).toBe(10)
+    expect(drills[0].fromY).toBe(10)
+    expect(drills[0].fromZ).toBe(2) // R plane
+    expect(drills[0].toZ).toBe(-15) // Z depth
+  })
+
+  it('G81 modal repeat at new XY position', () => {
+    const input = `G90
+M3 S18000
+G81 X10 Y10 Z-15 R2 F300
+X20 Y20
+X30 Y30`
+    const result = parseGCode(input)
+    const drills = result.operations.filter(
+      (op) => op.type === 'linear' && op.toZ < 0,
+    )
+    expect(drills).toHaveLength(3)
+    expect(drills[0].fromX).toBe(10)
+    expect(drills[1].fromX).toBe(20)
+    expect(drills[2].fromX).toBe(30)
+    // All drill to same depth
+    expect(drills[0].toZ).toBe(-15)
+    expect(drills[1].toZ).toBe(-15)
+    expect(drills[2].toZ).toBe(-15)
+  })
+
+  it('G80 cancels drilling cycle — subsequent XY does not drill', () => {
+    const input = `G90
+M3 S18000
+G81 X10 Y10 Z-15 R2 F300
+G80
+G0 X50 Y50`
+    const result = parseGCode(input)
+    const drills = result.operations.filter(
+      (op) => op.type === 'linear' && op.toZ < 0,
+    )
+    expect(drills).toHaveLength(1)
+    // After G80, X50 Y50 should be rapid move, not drill
+    expect(result.finalState.activeDrillingCycle).toBeUndefined()
+  })
+
+  it('G81 R plane is the retract/start point', () => {
+    const input = `G90
+M3 S18000
+G81 X10 Y10 Z-15 R5 F300`
+    const result = parseGCode(input)
+    const drills = result.operations.filter(
+      (op) => op.type === 'linear' && op.toZ < 0,
+    )
+    expect(drills[0].fromZ).toBe(5) // Starts from R plane
+  })
+
+  it('G81 sets feed rate from F parameter', () => {
+    const input = `G90
+M3 S18000
+G81 X10 Y10 Z-15 R2 F500`
+    const result = parseGCode(input)
+    const drills = result.operations.filter(
+      (op) => op.type === 'linear' && op.toZ < 0,
+    )
+    expect(drills[0].feedRate).toBe(500)
+  })
+})
+
+describe('G82/G83 drilling cycles', () => {
+  it('G82 with dwell parses without error', () => {
+    const input = `G90
+M3 S18000
+G82 X10 Y10 Z-15 R2 P500 F300`
+    const result = parseGCode(input)
+    expect(result.warnings).toHaveLength(0)
+    const drills = result.operations.filter(
+      (op) => op.type === 'linear' && op.toZ < 0,
+    )
+    expect(drills).toHaveLength(1)
+    expect(drills[0].toZ).toBe(-15)
+  })
+
+  it('G83 peck drill parses without error', () => {
+    const input = `G90
+M3 S18000
+G83 X10 Y10 Z-15 R2 Q5 F300`
+    const result = parseGCode(input)
+    expect(result.warnings).toHaveLength(0)
+    const drills = result.operations.filter(
+      (op) => op.type === 'linear' && op.toZ < 0,
+    )
+    // G83 produces single full-depth drill for CSG purposes
+    expect(drills).toHaveLength(1)
+    expect(drills[0].toZ).toBe(-15)
+  })
+
+  it('G82/G83 respect modal behavior and G80 cancellation', () => {
+    const input = `G90
+M3 S18000
+G83 X10 Y10 Z-15 R2 Q5 F300
+X20 Y20
+G80
+X30 Y30`
+    const result = parseGCode(input)
+    const drills = result.operations.filter(
+      (op) => op.type === 'linear' && op.toZ < 0,
+    )
+    // Two drills (first G83 + modal repeat), not three (G80 canceled)
+    expect(drills).toHaveLength(2)
+  })
+
+  it('G82 stores dwell parameter in cycle state', () => {
+    const input = `G90
+M3 S18000
+G82 X10 Y10 Z-15 R2 P500 F300`
+    const result = parseGCode(input)
+    expect(result.finalState.activeDrillingCycle).toBeDefined()
+    expect(result.finalState.activeDrillingCycle!.type).toBe('G82')
+    expect(result.finalState.activeDrillingCycle!.dwellMs).toBe(500)
+  })
+
+  it('G83 stores peck depth in cycle state', () => {
+    const input = `G90
+M3 S18000
+G83 X10 Y10 Z-15 R2 Q5 F300`
+    const result = parseGCode(input)
+    expect(result.finalState.activeDrillingCycle).toBeDefined()
+    expect(result.finalState.activeDrillingCycle!.type).toBe('G83')
+    expect(result.finalState.activeDrillingCycle!.peckDepth).toBe(5)
+  })
+})
