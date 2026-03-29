@@ -59,26 +59,30 @@ G0 X320 Y220
 G1 Z-5 F500
 G1 X380 Y280 F1200     ; Diagonal cut
 
-; === Through-hole pattern (drill simulation with end mill) ===
+; === Through-hole pattern — 5mm through drill ===
+M5
+T6 M6        ; 5mm through drill
+S4000 M3
+
 ; Hole 1
 G0 Z5
 G0 X50 Y50
-G1 Z-18 F400           ; Through the panel
+G1 Z-20 F300           ; Through the panel
 
 ; Hole 2
 G0 Z5
 G0 X350 Y50
-G1 Z-18 F400
+G1 Z-20 F300
 
 ; Hole 3
 G0 Z5
 G0 X350 Y250
-G1 Z-18 F400
+G1 Z-20 F300
 
 ; Hole 4
 G0 Z5
 G0 X200 Y150
-G1 Z-18 F400
+G1 Z-20 F300
 
 ; === Edge profile — bottom edge channel ===
 G0 Z5

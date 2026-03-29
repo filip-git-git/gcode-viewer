@@ -6,7 +6,13 @@ import type { ToolDefinition, TipType } from './types'
 
 const STORAGE_KEY = 'gcode-viewer-tools'
 
-const VALID_TIP_TYPES: TipType[] = ['flat-end-mill', 'ball-end-mill', 'drill', 'forstner', 'bull-nose']
+const VALID_TIP_TYPES: TipType[] = [
+  'flat-end-mill',
+  'ball-end-mill',
+  'drill',
+  'forstner',
+  'bull-nose',
+]
 
 /** Default tool library shipped with the application. */
 export const DEFAULT_TOOLS: ToolDefinition[] = [
@@ -46,6 +52,14 @@ export const DEFAULT_TOOLS: ToolDefinition[] = [
     tipType: 'ball-end-mill',
     cuttingLength: 25,
   },
+  {
+    toolNumber: 6,
+    name: '5mm Through Drill',
+    diameter: 5,
+    tipType: 'drill',
+    cuttingLength: 50,
+    tipAngle: 118,
+  },
 ]
 
 /** Validation error for a tool definition. */
@@ -74,14 +88,15 @@ export function validateTool(tool: unknown): asserts tool is ToolDefinition {
     throw new ToolValidationError('diameter must be a positive number')
   }
   if (!VALID_TIP_TYPES.includes(t.tipType as TipType)) {
-    throw new ToolValidationError(
-      `tipType must be one of: ${VALID_TIP_TYPES.join(', ')}`,
-    )
+    throw new ToolValidationError(`tipType must be one of: ${VALID_TIP_TYPES.join(', ')}`)
   }
   if (typeof t.cuttingLength !== 'number' || t.cuttingLength <= 0) {
     throw new ToolValidationError('cuttingLength must be a positive number')
   }
-  if (t.tipAngle !== undefined && (typeof t.tipAngle !== 'number' || t.tipAngle <= 0 || t.tipAngle >= 180)) {
+  if (
+    t.tipAngle !== undefined &&
+    (typeof t.tipAngle !== 'number' || t.tipAngle <= 0 || t.tipAngle >= 180)
+  ) {
     throw new ToolValidationError('tipAngle must be between 0 and 180 degrees')
   }
   if (t.cornerRadius !== undefined) {

@@ -88,18 +88,27 @@ function createFlatEndMillManifold(wasm: any, op: CsgOperationRequest): any {
     const zBottom = Math.min(op.fromZ, op.toZ)
     const zTop = Math.max(op.fromZ, op.toZ) + TOOL_CLEARANCE
     const height = zTop - zBottom
-    return Manifold.cylinder(height, radius, radius, RADIAL_SEGMENTS)
-      .translate([op.fromX, op.fromY, zBottom])
+    return Manifold.cylinder(height, radius, radius, RADIAL_SEGMENTS).translate([
+      op.fromX,
+      op.fromY,
+      zBottom,
+    ])
   }
 
   const topZ = TOOL_CLEARANCE
   const h1 = topZ - op.fromZ
   const h2 = topZ - op.toZ
 
-  const cyl1 = Manifold.cylinder(h1, radius, radius, RADIAL_SEGMENTS)
-    .translate([op.fromX, op.fromY, op.fromZ])
-  const cyl2 = Manifold.cylinder(h2, radius, radius, RADIAL_SEGMENTS)
-    .translate([op.toX, op.toY, op.toZ])
+  const cyl1 = Manifold.cylinder(h1, radius, radius, RADIAL_SEGMENTS).translate([
+    op.fromX,
+    op.fromY,
+    op.fromZ,
+  ])
+  const cyl2 = Manifold.cylinder(h2, radius, radius, RADIAL_SEGMENTS).translate([
+    op.toX,
+    op.toY,
+    op.toZ,
+  ])
 
   const result = Manifold.hull([cyl1, cyl2])
   cyl1.delete()
@@ -127,15 +136,25 @@ function createDrillManifold(wasm: any, op: CsgOperationRequest): any {
   const zTop = Math.max(op.fromZ, op.toZ) + TOOL_CLEARANCE
 
   // Conical tip: cylinder with top radius = radius, bottom radius = 0
-  const cone = Manifold.cylinder(tipHeight, 0, radius, RADIAL_SEGMENTS)
-    .translate([op.fromX, op.fromY, zBottom - tipHeight])
+  const cone = Manifold.cylinder(tipHeight, 0, radius, RADIAL_SEGMENTS).translate([
+    op.fromX,
+    op.fromY,
+    zBottom - tipHeight,
+  ])
 
   // Cylinder body from zBottom to zTop
   const bodyHeight = zTop - zBottom
-  const body = Manifold.cylinder(bodyHeight, radius, radius, RADIAL_SEGMENTS)
-    .translate([op.fromX, op.fromY, zBottom])
+  const body = Manifold.cylinder(bodyHeight, radius, radius, RADIAL_SEGMENTS).translate([
+    op.fromX,
+    op.fromY,
+    zBottom,
+  ])
 
-  const result = Manifold.union([cone, body])
+  // hull() instead of union(): cone+cylinder is convex so hull == union geometrically,
+  // but hull avoids the coplanar-face boolean operation where the cone's top and
+  // cylinder's bottom share an exact Z=zBottom face — that coplanar union can return
+  // an errored Manifold in manifold-3d v3, causing the outer subtraction to fail.
+  const result = Manifold.hull([cone, body])
   cone.delete()
   body.delete()
   return result
@@ -156,8 +175,11 @@ function createForstnerManifold(wasm: any, op: CsgOperationRequest): any {
   const zTop = Math.max(op.fromZ, op.toZ) + TOOL_CLEARANCE
   const height = zTop - zBottom
 
-  return Manifold.cylinder(height, radius, radius, RADIAL_SEGMENTS)
-    .translate([op.fromX, op.fromY, zBottom])
+  return Manifold.cylinder(height, radius, radius, RADIAL_SEGMENTS).translate([
+    op.fromX,
+    op.fromY,
+    zBottom,
+  ])
 }
 
 /**
@@ -181,15 +203,17 @@ function createBallEndMillManifold(wasm: any, op: CsgOperationRequest): any {
     const zTop = TOOL_CLEARANCE
     const bodyHeight = zTop - z - radius // cylinder from sphere center to top
     // Hemisphere: sphere intersected with upper half-space
-    const sphere = Manifold.sphere(radius, RADIAL_SEGMENTS || 24)
-      .translate([x, y, z + radius])
+    const sphere = Manifold.sphere(radius, RADIAL_SEGMENTS || 24).translate([x, y, z + radius])
 
     if (bodyHeight <= 0) {
       return sphere
     }
 
-    const body = Manifold.cylinder(bodyHeight, radius, radius, RADIAL_SEGMENTS)
-      .translate([x, y, z + radius])
+    const body = Manifold.cylinder(bodyHeight, radius, radius, RADIAL_SEGMENTS).translate([
+      x,
+      y,
+      z + radius,
+    ])
 
     const result = Manifold.union([sphere, body])
     sphere.delete()
@@ -258,8 +282,7 @@ async function doSubtractBatch(
 
   // Union all tool volumes into one Manifold (true boolean union — no internal faces).
   // Manifold.union() batch method is more efficient than sequential .add() calls.
-  const toolUnion =
-    toolManifolds.length === 1 ? toolManifolds[0] : Manifold.union(toolManifolds)
+  const toolUnion = toolManifolds.length === 1 ? toolManifolds[0] : Manifold.union(toolManifolds)
 
   // Clean up individual tool manifolds (batch union creates a new object)
   if (toolManifolds.length > 1) {
@@ -282,7 +305,8 @@ async function doSubtractBatch(
   const runIndex: Uint32Array = mesh.runIndex
   const runOriginalID: Uint32Array = mesh.runOriginalID
 
-  for (let r = 0; r < runOriginalID.length; r++) {
+  // Guard: getMesh() may return undefined runOriginalID when provenance is unavailable
+  for (let r = 0; runOriginalID && runIndex && r < runOriginalID.length; r++) {
     const start = runIndex[r]
     const count = runIndex[r + 1] - start
     if (count === 0) continue
@@ -313,10 +337,7 @@ self.onmessage = async (e: MessageEvent<ManifoldWorkerRequest>) => {
   try {
     if (type !== 'subtractBatch') return
 
-    const { geometry, elapsedMs } = await doSubtractBatch(
-      e.data.workpieceDims,
-      e.data.operations,
-    )
+    const { geometry, elapsedMs } = await doSubtractBatch(e.data.workpieceDims, e.data.operations)
 
     const response: ManifoldWorkerResponse = { id, geometry, elapsedMs }
     const transfer: Transferable[] = [geometry.position.buffer]
