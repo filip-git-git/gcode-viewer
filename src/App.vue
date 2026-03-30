@@ -17,27 +17,27 @@ import AppShell from './app/AppShell.vue'
 
 :root {
   /* ── Palette ─────────────────────────────── */
-  --color-bg:              #0d1117;
-  --color-surface:         #161b22;
-  --color-editor-bg:       #0d1117;
-  --color-border:          #30363d;
-  --color-hover:           rgba(177, 186, 196, 0.06);
-  --color-active:          rgba(177, 186, 196, 0.1);
+  --color-bg: #0d1117;
+  --color-surface: #161b22;
+  --color-editor-bg: #0d1117;
+  --color-border: #30363d;
+  --color-hover: rgba(177, 186, 196, 0.06);
+  --color-active: rgba(177, 186, 196, 0.1);
 
   /* ── Text ────────────────────────────────── */
-  --color-text:            #e6edf3;
-  --color-text-secondary:  #c9d1d9;
-  --color-text-muted:      #8b949e;
+  --color-text: #e6edf3;
+  --color-text-secondary: #c9d1d9;
+  --color-text-muted: #8b949e;
 
   /* ── Accent ──────────────────────────────── */
-  --color-amber:           #e8a838;
-  --color-blue:            #58a6ff;
-  --color-green:           #3fb950;
-  --color-warning:         #d29922;
-  --color-error:           #f85149;
+  --color-amber: #e8a838;
+  --color-blue: #58a6ff;
+  --color-green: #3fb950;
+  --color-warning: #d29922;
+  --color-error: #f85149;
 
   /* ── Typography ──────────────────────────── */
-  --font-ui:   'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
 }
 
@@ -50,7 +50,8 @@ import AppShell from './app/AppShell.vue'
   padding: 0;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   overflow: hidden;
   background: var(--color-bg);
@@ -122,5 +123,48 @@ body::before {
       transparent 1px,
       transparent 60px
     );
+}
+
+/* ── Dialog Buttons ────────────────────────── */
+.dialog__btn {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.dialog__btn--secondary {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+.dialog__btn--secondary:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.dialog__btn--primary {
+  background: var(--color-amber);
+  border: 1px solid var(--color-amber);
+  color: #0d1117;
+  font-weight: 600;
+}
+.dialog__btn--primary:hover {
+  background: #d49830;
+  border-color: #d49830;
+}
+
+.dialog__btn--danger {
+  background: var(--color-error);
+  border: 1px solid var(--color-error);
+  color: white;
+}
+.dialog__btn--danger:hover {
+  background: #d63c36;
+  border-color: #d63c36;
+  box-shadow: 0 2px 8px rgba(248, 81, 73, 0.35);
 }
 </style>

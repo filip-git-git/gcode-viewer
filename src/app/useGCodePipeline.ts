@@ -11,9 +11,12 @@ import { simulate } from '../simulation/simulationEngine'
 import { ManifoldCsgEngine } from '../csg/manifoldEngine'
 import { useWorkpieceScene, type WorkpieceSceneState } from '../viewport/useWorkpieceScene'
 import { useToolStore } from '../tools/useToolStore'
-import { useSimulationPlayback, type SimulationPlaybackState } from '../simulation/useSimulationPlayback'
+import {
+  useSimulationPlayback,
+  type SimulationPlaybackState,
+} from '../simulation/useSimulationPlayback'
 import type { ParseResult, ParseWarning, WorkpieceDimensions } from '../parser/types'
-import type { CsgOperationRequest, SimulationWarning } from '../simulation/types'
+import type { SimulationWarning } from '../simulation/types'
 
 const DEBOUNCE_MS = 300
 

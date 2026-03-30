@@ -5,13 +5,7 @@
  * and returns zero or more operations plus the next machine state.
  */
 
-import type {
-  ParsedToken,
-  MachineState,
-  Operation,
-  MotionMode,
-  DrillingCycleState,
-} from './types'
+import type { ParsedToken, MachineState, Operation, MotionMode, DrillingCycleState } from './types'
 
 export interface HandlerResult {
   operations: Operation[]
@@ -225,24 +219,16 @@ const gCodeHandlers = new Map<number, CommandHandler>()
 const mCodeHandlers = new Map<number, CommandHandler>()
 
 // G0 — Rapid positioning
-gCodeHandlers.set(0, (tokens, state, ln) =>
-  handleMotion('G0', 'rapid', tokens, state, ln),
-)
+gCodeHandlers.set(0, (tokens, state, ln) => handleMotion('G0', 'rapid', tokens, state, ln))
 
 // G1 — Linear interpolation
-gCodeHandlers.set(1, (tokens, state, ln) =>
-  handleMotion('G1', 'linear', tokens, state, ln),
-)
+gCodeHandlers.set(1, (tokens, state, ln) => handleMotion('G1', 'linear', tokens, state, ln))
 
 // G2 — Clockwise arc interpolation
-gCodeHandlers.set(2, (tokens, state, ln) =>
-  handleArc('G2', 'arc-cw', tokens, state, ln),
-)
+gCodeHandlers.set(2, (tokens, state, ln) => handleArc('G2', 'arc-cw', tokens, state, ln))
 
 // G3 — Counter-clockwise arc interpolation
-gCodeHandlers.set(3, (tokens, state, ln) =>
-  handleArc('G3', 'arc-ccw', tokens, state, ln),
-)
+gCodeHandlers.set(3, (tokens, state, ln) => handleArc('G3', 'arc-ccw', tokens, state, ln))
 
 // G17 — XY plane select (default, no-op for now)
 gCodeHandlers.set(17, (_tokens, state) => ({
@@ -269,25 +255,22 @@ gCodeHandlers.set(90, (_tokens, state) => ({
 }))
 
 // G80 — Cancel drilling cycle
-gCodeHandlers.set(80, (_tokens, state) => ({
-  operations: [],
-  nextState: { ...state, activeDrillingCycle: undefined },
-}))
+gCodeHandlers.set(80, (_tokens, state) => {
+  const { activeDrillingCycle: _removed, ...rest } = state
+  return {
+    operations: [],
+    nextState: { ...rest, positioningMode: 'G90' },
+  }
+})
 
 // G81 — Simple drilling cycle
-gCodeHandlers.set(81, (tokens, state, ln) =>
-  handleDrillingCycle('G81', tokens, state, ln),
-)
+gCodeHandlers.set(81, (tokens, state, ln) => handleDrillingCycle('G81', tokens, state, ln))
 
 // G82 — Drilling cycle with dwell
-gCodeHandlers.set(82, (tokens, state, ln) =>
-  handleDrillingCycle('G82', tokens, state, ln),
-)
+gCodeHandlers.set(82, (tokens, state, ln) => handleDrillingCycle('G82', tokens, state, ln))
 
 // G83 — Peck drilling cycle
-gCodeHandlers.set(83, (tokens, state, ln) =>
-  handleDrillingCycle('G83', tokens, state, ln),
-)
+gCodeHandlers.set(83, (tokens, state, ln) => handleDrillingCycle('G83', tokens, state, ln))
 
 // G91 — Incremental positioning
 gCodeHandlers.set(91, (_tokens, state) => ({

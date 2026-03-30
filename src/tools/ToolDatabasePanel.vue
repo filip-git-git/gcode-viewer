@@ -637,39 +637,3 @@ function resetDefaults(): void {
   text-decoration: underline;
 }
 </style>
-
-<style>
-.dialog__btn {
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 400;
-  padding: 6px 12px;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: all 0.12s;
-}
-
-.dialog__btn--secondary {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-}
-
-.dialog__btn--secondary:hover {
-  background: var(--color-hover);
-  color: var(--color-text);
-}
-
-.dialog__btn--danger {
-  background: var(--color-error);
-  border: 1px solid var(--color-error);
-  color: white;
-  font-weight: 400;
-}
-
-.dialog__btn--danger:hover {
-  background: #d63c36;
-  border-color: #d63c36;
-  box-shadow: 0 2px 8px rgba(248, 81, 73, 0.35);
-}
-</style>

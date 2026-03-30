@@ -361,27 +361,6 @@ function onKeyDown(e: KeyboardEvent): void {
   border-top: 1px solid var(--color-border);
 }
 
-.dialog__btn {
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 400;
-  padding: 6px 12px;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: all 0.12s;
-}
-
-.dialog__btn--secondary {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-}
-
-.dialog__btn--secondary:hover {
-  background: var(--color-hover);
-  color: var(--color-text);
-}
-
 .dialog__btn--primary {
   background: var(--color-amber);
   border: 1px solid var(--color-amber);

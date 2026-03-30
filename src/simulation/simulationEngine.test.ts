@@ -527,23 +527,31 @@ M30
 describe('tessellateArc', () => {
   const makeArcOp = (overrides: Partial<Operation>): Operation => ({
     type: 'arc-cw',
-    fromX: 10, fromY: 0, fromZ: -5,
-    toX: 0, toY: 10, toZ: -5,
+    fromX: 10,
+    fromY: 0,
+    fromZ: -5,
+    toX: 0,
+    toY: 10,
+    toZ: -5,
     feedRate: 1000,
     toolNumber: 1,
     spindleState: 'cw',
     spindleSpeed: 18000,
     lineNumber: 1,
-    centerI: -10, centerJ: 0,
+    centerI: -10,
+    centerJ: 0,
     ...overrides,
   })
 
   it('produces multiple linear segments for a 90-degree arc', () => {
     // Arc from (10,0) to (0,10) around center (0,0), radius 10, CW
     const op = makeArcOp({
-      fromX: 10, fromY: 0,
-      toX: 0, toY: 10,
-      centerI: -10, centerJ: 0,
+      fromX: 10,
+      fromY: 0,
+      toX: 0,
+      toY: 10,
+      centerI: -10,
+      centerJ: 0,
     })
     const segments = tessellateArc(op)
     expect(segments.length).toBeGreaterThanOrEqual(2)
@@ -561,9 +569,12 @@ describe('tessellateArc', () => {
 
   it('full circle (start == end) produces closed arc', () => {
     const op = makeArcOp({
-      fromX: 10, fromY: 0,
-      toX: 10, toY: 0,
-      centerI: -10, centerJ: 0,
+      fromX: 10,
+      fromY: 0,
+      toX: 10,
+      toY: 0,
+      centerI: -10,
+      centerJ: 0,
     })
     const segments = tessellateArc(op)
     expect(segments.length).toBeGreaterThanOrEqual(10)
@@ -577,15 +588,21 @@ describe('tessellateArc', () => {
   it('CCW arc produces segments in opposite direction', () => {
     const cwOp = makeArcOp({
       type: 'arc-cw',
-      fromX: 10, fromY: 0,
-      toX: 0, toY: 10,
-      centerI: -10, centerJ: 0,
+      fromX: 10,
+      fromY: 0,
+      toX: 0,
+      toY: 10,
+      centerI: -10,
+      centerJ: 0,
     })
     const ccwOp = makeArcOp({
       type: 'arc-ccw',
-      fromX: 10, fromY: 0,
-      toX: 0, toY: 10,
-      centerI: -10, centerJ: 0,
+      fromX: 10,
+      fromY: 0,
+      toX: 0,
+      toY: 10,
+      centerI: -10,
+      centerJ: 0,
     })
 
     const cwSegs = tessellateArc(cwOp)
@@ -600,10 +617,15 @@ describe('tessellateArc', () => {
   })
 
   it('R-form arc produces valid segments', () => {
-    const op = makeArcOp({
-      fromX: 0, fromY: 0,
-      toX: 10, toY: 10,
-      centerI: undefined, centerJ: undefined,
+    const {
+      centerI: _ci,
+      centerJ: _cj,
+      ...op
+    } = makeArcOp({
+      fromX: 0,
+      fromY: 0,
+      toX: 10,
+      toY: 10,
       radius: 10,
     })
     const segments = tessellateArc(op)
@@ -617,7 +639,8 @@ describe('tessellateArc', () => {
 
   it('preserves Z across flat arc', () => {
     const op = makeArcOp({
-      fromZ: -3, toZ: -3,
+      fromZ: -3,
+      toZ: -3,
     })
     const segments = tessellateArc(op)
     for (const seg of segments) {
@@ -628,7 +651,8 @@ describe('tessellateArc', () => {
 
   it('interpolates Z for helical arc', () => {
     const op = makeArcOp({
-      fromZ: 0, toZ: -10,
+      fromZ: 0,
+      toZ: -10,
     })
     const segments = tessellateArc(op)
     // First segment starts at Z=0

@@ -62,9 +62,7 @@ export class ManifoldCsgEngine implements CSGEngine {
     }
   }
 
-  private send(
-    req: Omit<ManifoldWorkerRequest, 'id'>,
-  ): Promise<ManifoldWorkerResponse> {
+  private send(req: Omit<ManifoldWorkerRequest, 'id'>): Promise<ManifoldWorkerResponse> {
     const id = this.nextId++
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject })
@@ -105,6 +103,11 @@ export class ManifoldCsgEngine implements CSGEngine {
     // Return Three.js geometry for the viewport display
     const geo = new BoxGeometry(width, height, thickness)
     geo.translate(width / 2, height / 2, -thickness / 2)
+    // BoxGeometry creates 6 groups (materialIndex 0-5), but we only have 2 materials.
+    // Remap all groups to materialIndex 0 so all faces render correctly.
+    for (const group of geo.groups) {
+      group.materialIndex = 0
+    }
     return geo
   }
 

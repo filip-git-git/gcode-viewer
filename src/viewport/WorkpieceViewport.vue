@@ -16,7 +16,6 @@ import { computed, ref, toRefs, watch, onMounted, onUnmounted } from 'vue'
 import { BufferGeometry, type Material } from 'three'
 import ViewSwitcher from './ViewSwitcher.vue'
 import {
-  calculateCameraPosition,
   calculatePresetCamera,
   DEFAULT_CAMERA_POSITION,
   DEFAULT_CAMERA_TARGET,

@@ -9,7 +9,7 @@
  * takes ~50ms — fast enough for interactive stepping without snapshots.
  */
 
-import { ref, shallowRef, computed, type Ref, type ShallowRef, type ComputedRef } from 'vue'
+import { ref, shallowRef, computed, type Ref, type ComputedRef } from 'vue'
 import type { CsgOperationRequest } from './types'
 import type { WorkpieceDimensions } from '../parser/types'
 import type { WorkpieceSceneState } from '../viewport/useWorkpieceScene'

@@ -69,7 +69,7 @@ export function simulate(input: SimulationInput): SimulationResult {
           toolDiameter: tool.diameter,
           operationIndex: csgIndex,
           sourceLineNumber: op.lineNumber,
-          tipAngle: tool.tipAngle,
+          tipAngle: tool.tipAngle ?? 118,
         })
         csgIndex++
       }
@@ -91,7 +91,7 @@ export function simulate(input: SimulationInput): SimulationResult {
       toolDiameter: tool.diameter,
       operationIndex: csgIndex,
       sourceLineNumber: op.lineNumber,
-      tipAngle: tool.tipAngle,
+      tipAngle: tool.tipAngle ?? 118,
     })
 
     csgIndex++
@@ -149,24 +149,41 @@ export function tessellateArc(op: Operation): LinearSegment[] {
   } else if (op.radius !== undefined) {
     // R form: compute center from start, end, and radius
     const computed = computeCenterFromRadius(
-      op.fromX, op.fromY, op.toX, op.toY, op.radius, op.type === 'arc-cw',
+      op.fromX,
+      op.fromY,
+      op.toX,
+      op.toY,
+      op.radius,
+      op.type === 'arc-cw',
     )
     centerX = computed.cx
     centerY = computed.cy
   } else {
     // No arc specification — return single linear segment as fallback
-    return [{
-      fromX: op.fromX, fromY: op.fromY, fromZ: op.fromZ,
-      toX: op.toX, toY: op.toY, toZ: op.toZ,
-    }]
+    return [
+      {
+        fromX: op.fromX,
+        fromY: op.fromY,
+        fromZ: op.fromZ,
+        toX: op.toX,
+        toY: op.toY,
+        toZ: op.toZ,
+      },
+    ]
   }
 
   const r = Math.sqrt((op.fromX - centerX) ** 2 + (op.fromY - centerY) ** 2)
   if (r < 1e-6) {
-    return [{
-      fromX: op.fromX, fromY: op.fromY, fromZ: op.fromZ,
-      toX: op.toX, toY: op.toY, toZ: op.toZ,
-    }]
+    return [
+      {
+        fromX: op.fromX,
+        fromY: op.fromY,
+        fromZ: op.fromZ,
+        toX: op.toX,
+        toY: op.toY,
+        toZ: op.toZ,
+      },
+    ]
   }
 
   let startAngle = Math.atan2(op.fromY - centerY, op.fromX - centerX)
@@ -195,9 +212,7 @@ export function tessellateArc(op: Operation): LinearSegment[] {
   // Segment count from chord-error tolerance
   // chord error = r * (1 - cos(theta/2)), solve for theta: theta = 2 * acos(1 - error/r)
   const maxAnglePerSegment =
-    ARC_CHORD_ERROR >= r
-      ? Math.PI / 4
-      : 2 * Math.acos(1 - ARC_CHORD_ERROR / r)
+    ARC_CHORD_ERROR >= r ? Math.PI / 4 : 2 * Math.acos(1 - ARC_CHORD_ERROR / r)
   const numSegments = Math.max(2, Math.ceil(Math.abs(sweep) / maxAnglePerSegment))
 
   // Z interpolation (helical arcs)
@@ -228,8 +243,12 @@ export function tessellateArc(op: Operation): LinearSegment[] {
  * Convention: positive R = shorter arc, negative R = longer arc.
  */
 function computeCenterFromRadius(
-  x1: number, y1: number, x2: number, y2: number,
-  r: number, clockwise: boolean,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  r: number,
+  clockwise: boolean,
 ): { cx: number; cy: number } {
   const dx = x2 - x1
   const dy = y2 - y1
@@ -248,7 +267,7 @@ function computeCenterFromRadius(
   const py = dx / d
 
   // Choose side based on direction and R sign
-  const sign = (clockwise !== (r < 0)) ? 1 : -1
+  const sign = clockwise !== r < 0 ? 1 : -1
 
   return {
     cx: mx + sign * h * px,
