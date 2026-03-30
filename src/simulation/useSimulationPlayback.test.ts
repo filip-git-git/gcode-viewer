@@ -62,11 +62,12 @@ const DIMS: WorkpieceDimensions = { width: 200, height: 100, thickness: 18 }
 
 describe('useSimulationPlayback', () => {
   let engine: CSGEngine
+  let scene: ReturnType<typeof useWorkpieceScene>
   let playback: ReturnType<typeof useSimulationPlayback>
 
   beforeEach(() => {
     engine = createMockEngine()
-    const scene = useWorkpieceScene(engine)
+    scene = useWorkpieceScene(engine)
     playback = useSimulationPlayback(scene)
   })
 
@@ -98,11 +99,18 @@ describe('useSimulationPlayback', () => {
     expect(playback.isStepMode.value).toBe(false)
   })
 
-  it('exitStepMode clears step mode', () => {
-    playback.load(makeOps(5), DIMS)
+  it('exitStepMode clears step mode and recomputes final workpiece', async () => {
+    const ops = makeOps(5)
+    playback.load(ops, DIMS)
     playback.enterStepMode()
+    await playback.stepForward()
+    await playback.stepForward()
+    expect(playback.currentStep.value).toBe(2)
+    const recomputeSpy = vi.spyOn(scene, 'recomputeWorkpiece')
     playback.exitStepMode()
     expect(playback.isStepMode.value).toBe(false)
+    expect(recomputeSpy).toHaveBeenCalledOnce()
+    expect(recomputeSpy).toHaveBeenCalledWith(DIMS, ops)
   })
 
   it('stepForward increments currentStep', async () => {

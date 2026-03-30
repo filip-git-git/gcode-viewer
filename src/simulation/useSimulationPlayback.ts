@@ -91,6 +91,9 @@ export function useSimulationPlayback(scene: WorkpieceSceneState): SimulationPla
     pause()
     isStepMode.value = false
     currentStep.value = 0
+    if (dimensions && operations.value.length > 0) {
+      scene.recomputeWorkpiece(dimensions, operations.value)
+    }
   }
 
   async function applyStepGeometry(step: number): Promise<void> {
