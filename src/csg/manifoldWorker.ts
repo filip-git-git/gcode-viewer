@@ -121,6 +121,10 @@ function createFlatEndMillManifold(wasm: any, op: CsgOperationRequest): any {
  * Cylinder body + conical tip.
  * Point angle from op.tipAngle (degrees), defaults to 118° standard.
  * Drills are vertical-only operations (no lateral hull).
+ *
+ * Note: Manifold.cylinder(h, radiusLow=0) is not guaranteed to work since
+ * radiusLow "Must be positive" per API docs. We use Manifold.revolve() instead
+ * to create the cone from a triangular profile.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function createDrillManifold(wasm: any, op: CsgOperationRequest): any {
@@ -135,12 +139,27 @@ function createDrillManifold(wasm: any, op: CsgOperationRequest): any {
   const zBottom = Math.min(op.fromZ, op.toZ)
   const zTop = Math.max(op.fromZ, op.toZ) + TOOL_CLEARANCE
 
-  // Conical tip: cylinder with top radius = radius, bottom radius = 0
-  const cone = Manifold.cylinder(tipHeight, 0, radius, RADIAL_SEGMENTS).translate([
-    op.fromX,
-    op.fromY,
-    zBottom - tipHeight,
-  ])
+  // Conical tip: using Manifold.revolve() instead of cylinder(h, 0, r)
+  // because cylinder() requires radiusLow > 0 per API docs.
+  //
+  // Triangle in X-Y plane for revolve:
+  // - (0, 0): apex at origin (becomes Y=0 after revolve)
+  // - (radius, 0): base point on X-axis at Y=0
+  // - (0, tipHeight): height point on Y-axis at Y=tipHeight
+  // Polygon must be closed (last point = first point) to create a solid cone.
+  // Revolve around Y-axis creates cone with axis along Y, apex at Y=0, base at Y=tipHeight.
+  // Cone is pointing in +Y direction (Y+).
+  //
+  // After rotate(180, 0, 0): Y-axis → -Y axis, so +Y becomes -Y (pointing down).
+  const conePolygon = [
+    [0, 0],
+    [radius, 0],
+    [0, tipHeight],
+    [0, 0], // close the polygon to create a solid cone, not a shell
+  ]
+  const cone = Manifold.revolve([conePolygon], RADIAL_SEGMENTS, 360)
+    .rotate(180, 0, 0)
+    .translate([op.fromX, op.fromY, zBottom])
 
   // Cylinder body from zBottom to zTop
   const bodyHeight = zTop - zBottom
@@ -155,9 +174,15 @@ function createDrillManifold(wasm: any, op: CsgOperationRequest): any {
   // cylinder's bottom share an exact Z=zBottom face — that coplanar union can return
   // an errored Manifold in manifold-3d v3, causing the outer subtraction to fail.
   const result = Manifold.hull([cone, body])
+
+  // Translate the entire result UP by tipHeight to compensate for the cone
+  // being positioned with apex at zBottom - tipHeight instead of zBottom
+  const resultTranslated = result.translate([0, 0, tipHeight])
+
   cone.delete()
   body.delete()
-  return result
+  result.delete()
+  return resultTranslated
 }
 
 /**
