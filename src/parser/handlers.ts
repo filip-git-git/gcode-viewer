@@ -255,13 +255,10 @@ gCodeHandlers.set(90, (_tokens, state) => ({
 }))
 
 // G80 — Cancel drilling cycle
-gCodeHandlers.set(80, (_tokens, state) => {
-  const { activeDrillingCycle: _removed, ...rest } = state
-  return {
-    operations: [],
-    nextState: { ...rest, positioningMode: 'G90' },
-  }
-})
+gCodeHandlers.set(80, (_tokens, state) => ({
+  operations: [],
+  nextState: { ...state, activeDrillingCycle: undefined, positioningMode: 'G90' },
+}))
 
 // G81 — Simple drilling cycle
 gCodeHandlers.set(81, (tokens, state, ln) => handleDrillingCycle('G81', tokens, state, ln))

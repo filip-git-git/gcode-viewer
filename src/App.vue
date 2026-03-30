@@ -31,10 +31,12 @@ import AppShell from './app/AppShell.vue'
 
   /* ── Accent ──────────────────────────────── */
   --color-amber: #e8a838;
+  --color-amber-hover: #d49830;
   --color-blue: #58a6ff;
   --color-green: #3fb950;
   --color-warning: #d29922;
   --color-error: #f85149;
+  --color-error-hover: #d63c36;
 
   /* ── Typography ──────────────────────────── */
   --font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -153,8 +155,8 @@ body::before {
   font-weight: 600;
 }
 .dialog__btn--primary:hover {
-  background: #d49830;
-  border-color: #d49830;
+  background: var(--color-amber-hover);
+  border-color: var(--color-amber-hover);
 }
 
 .dialog__btn--danger {
@@ -163,8 +165,8 @@ body::before {
   color: white;
 }
 .dialog__btn--danger:hover {
-  background: #d63c36;
-  border-color: #d63c36;
+  background: var(--color-error-hover);
+  border-color: var(--color-error-hover);
   box-shadow: 0 2px 8px rgba(248, 81, 73, 0.35);
 }
 </style>

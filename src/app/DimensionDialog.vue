@@ -361,15 +361,4 @@ function onKeyDown(e: KeyboardEvent): void {
   border-top: 1px solid var(--color-border);
 }
 
-.dialog__btn--primary {
-  background: var(--color-amber);
-  border: 1px solid var(--color-amber);
-  color: #0d1117;
-  font-weight: 600;
-}
-
-.dialog__btn--primary:hover {
-  background: #d49830;
-  border-color: #d49830;
-}
 </style>

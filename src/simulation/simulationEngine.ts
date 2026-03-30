@@ -18,6 +18,9 @@ import type {
 /** Chord-error tolerance for arc tessellation (mm) */
 const ARC_CHORD_ERROR = 0.1
 
+/** Default drill tip angle when not specified by tool definition */
+const DEFAULT_TIP_ANGLE = 118
+
 /**
  * Run the simulation engine on parsed GCode output.
  *
@@ -69,7 +72,7 @@ export function simulate(input: SimulationInput): SimulationResult {
           toolDiameter: tool.diameter,
           operationIndex: csgIndex,
           sourceLineNumber: op.lineNumber,
-          tipAngle: tool.tipAngle ?? 118,
+          tipAngle: tool.tipAngle ?? DEFAULT_TIP_ANGLE,
         })
         csgIndex++
       }
@@ -91,7 +94,7 @@ export function simulate(input: SimulationInput): SimulationResult {
       toolDiameter: tool.diameter,
       operationIndex: csgIndex,
       sourceLineNumber: op.lineNumber,
-      tipAngle: tool.tipAngle ?? 118,
+      tipAngle: tool.tipAngle ?? DEFAULT_TIP_ANGLE,
     })
 
     csgIndex++
