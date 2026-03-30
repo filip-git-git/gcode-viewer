@@ -35,7 +35,9 @@ onMounted(() => {
       if (dims.width > 0) width.value = dims.width
       if (dims.height > 0) height.value = dims.height
       if (dims.thickness > 0) thickness.value = dims.thickness
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 })
 
@@ -88,30 +90,23 @@ function onKeyDown(e: KeyboardEvent): void {
 
 <template>
   <Teleport to="body">
-    <div
-      v-if="open"
-      class="dialog-overlay"
-      @click.self="$emit('close')"
-      @keydown="onKeyDown"
-    >
-      <div
-        class="dialog"
-        role="dialog"
-        aria-label="Workpiece dimensions"
-        aria-modal="true"
-      >
+    <div v-if="open" class="dialog-overlay" @click.self="$emit('close')" @keydown="onKeyDown">
+      <div class="dialog" role="dialog" aria-label="Workpiece dimensions" aria-modal="true">
         <div class="dialog__header">
           <h2 class="dialog__title">Workpiece Dimensions</h2>
           <button class="dialog__close" @click="$emit('close')" aria-label="Close">
             <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
-              <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
+              <path
+                d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"
+              />
             </svg>
           </button>
         </div>
 
         <div class="dialog__body">
           <p class="dialog__hint">
-            Enter panel dimensions in millimeters. These are used when dimensions aren't specified in the GCode file.
+            Enter panel dimensions in millimeters. These are used when dimensions aren't specified
+            in the GCode file.
           </p>
 
           <div class="dialog__fields">
@@ -172,12 +167,8 @@ function onKeyDown(e: KeyboardEvent): void {
         </div>
 
         <div class="dialog__footer">
-          <button class="dialog__btn dialog__btn--secondary" @click="$emit('close')">
-            Cancel
-          </button>
-          <button class="dialog__btn dialog__btn--primary" @click="apply">
-            Apply
-          </button>
+          <button class="dialog__btn dialog__btn--secondary" @click="$emit('close')">Cancel</button>
+          <button class="dialog__btn dialog__btn--primary" @click="apply">Apply</button>
         </div>
       </div>
     </div>
@@ -198,7 +189,9 @@ function onKeyDown(e: KeyboardEvent): void {
 }
 
 @keyframes overlay-in {
-  from { opacity: 0; }
+  from {
+    opacity: 0;
+  }
 }
 
 .dialog {
@@ -212,7 +205,10 @@ function onKeyDown(e: KeyboardEvent): void {
 }
 
 @keyframes dialog-in {
-  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
 }
 
 .dialog__header {
@@ -368,8 +364,8 @@ function onKeyDown(e: KeyboardEvent): void {
 .dialog__btn {
   font-family: var(--font-ui);
   font-size: 12px;
-  font-weight: 500;
-  padding: 6px 14px;
+  font-weight: 400;
+  padding: 6px 12px;
   border-radius: 3px;
   cursor: pointer;
   transition: all 0.12s;

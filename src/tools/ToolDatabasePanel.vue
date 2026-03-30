@@ -27,8 +27,8 @@ const TIP_TYPE_LABELS: Record<TipType, string> = {
   'flat-end-mill': 'Flat End Mill',
   'ball-end-mill': 'Ball End Mill',
   'bull-nose': 'Bull Nose',
-  'drill': 'Drill',
-  'forstner': 'Forstner',
+  drill: 'Drill',
+  forstner: 'Forstner',
 }
 
 const TIP_TYPES: TipType[] = ['flat-end-mill', 'ball-end-mill', 'bull-nose', 'drill', 'forstner']
@@ -54,9 +54,7 @@ function onTipTypeChange(tipType: TipType): void {
   }
 }
 
-const sortedTools = computed(() =>
-  [...toolStore.tools].sort((a, b) => a.toolNumber - b.toolNumber),
-)
+const sortedTools = computed(() => [...toolStore.tools].sort((a, b) => a.toolNumber - b.toolNumber))
 
 function startAdd(): void {
   const maxNumber = toolStore.tools.reduce((max, t) => Math.max(max, t.toolNumber), 0)
@@ -113,12 +111,16 @@ function resetDefaults(): void {
             <div class="tool-panel__header-actions">
               <button class="tool-panel__btn-icon" title="Add tool" @click="startAdd">
                 <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
-                  <path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z" />
+                  <path
+                    d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z"
+                  />
                 </svg>
               </button>
               <button class="tool-panel__btn-icon" @click="$emit('close')" aria-label="Close">
                 <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
-                  <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
+                  <path
+                    d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"
+                  />
                 </svg>
               </button>
             </div>
@@ -143,7 +145,11 @@ function resetDefaults(): void {
 
               <label class="tool-panel__field">
                 <span>Name</span>
-                <input v-model="editingTool.name" type="text" placeholder="e.g., 6mm Flat End Mill" />
+                <input
+                  v-model="editingTool.name"
+                  type="text"
+                  placeholder="e.g., 6mm Flat End Mill"
+                />
               </label>
 
               <label class="tool-panel__field">
@@ -153,7 +159,10 @@ function resetDefaults(): void {
 
               <label class="tool-panel__field">
                 <span>Tip Type</span>
-                <select v-model="editingTool.tipType" @change="onTipTypeChange(editingTool!.tipType)">
+                <select
+                  v-model="editingTool.tipType"
+                  @change="onTipTypeChange(editingTool!.tipType)"
+                >
                   <option v-for="tt in TIP_TYPES" :key="tt" :value="tt">
                     {{ TIP_TYPE_LABELS[tt] }}
                   </option>
@@ -184,14 +193,21 @@ function resetDefaults(): void {
 
               <label class="tool-panel__field">
                 <span>Cutting Length (mm)</span>
-                <input v-model.number="editingTool.cuttingLength" type="number" min="0.1" step="0.5" />
+                <input
+                  v-model.number="editingTool.cuttingLength"
+                  type="number"
+                  min="0.1"
+                  step="0.5"
+                />
               </label>
             </div>
 
             <p class="tool-panel__error" v-if="toolStore.error">{{ toolStore.error }}</p>
 
             <div class="tool-panel__edit-actions">
-              <button class="tool-panel__btn tool-panel__btn--secondary" @click="cancelEdit">Cancel</button>
+              <button class="tool-panel__btn tool-panel__btn--secondary" @click="cancelEdit">
+                Cancel
+              </button>
               <button class="tool-panel__btn tool-panel__btn--primary" @click="saveTool">
                 {{ isAdding ? 'Add' : 'Save' }}
               </button>
@@ -211,11 +227,7 @@ function resetDefaults(): void {
                 </tr>
               </thead>
               <tbody>
-                <tr
-                  v-for="tool in sortedTools"
-                  :key="tool.toolNumber"
-                  @click="startEdit(tool)"
-                >
+                <tr v-for="tool in sortedTools" :key="tool.toolNumber" @click="startEdit(tool)">
                   <td class="tool-panel__cell-number">T{{ tool.toolNumber }}</td>
                   <td>{{ tool.name }}</td>
                   <td class="tool-panel__cell-dim">{{ tool.diameter }}mm</td>
@@ -231,7 +243,9 @@ function resetDefaults(): void {
                       @click.stop="confirmDelete(tool.toolNumber)"
                     >
                       <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
-                        <path d="M6.5 1.75a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V3h-3V1.75zM11 3h3.25a.75.75 0 010 1.5H13.2l-.82 8.199A1.5 1.5 0 0110.886 14H5.114a1.5 1.5 0 01-1.494-1.301L2.8 4.5H1.75a.75.75 0 010-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75V3z" />
+                        <path
+                          d="M6.5 1.75a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V3h-3V1.75zM11 3h3.25a.75.75 0 010 1.5H13.2l-.82 8.199A1.5 1.5 0 0110.886 14H5.114a1.5 1.5 0 01-1.494-1.301L2.8 4.5H1.75a.75.75 0 010-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75V3z"
+                        />
                       </svg>
                     </button>
                   </td>
@@ -248,21 +262,41 @@ function resetDefaults(): void {
           </div>
 
           <!-- Delete Confirmation -->
-          <Teleport to="body">
-            <div class="dialog-overlay" v-if="deleteConfirm !== null" @click.self="deleteConfirm = null">
-              <div class="dialog" style="width: 320px;">
-                <div class="dialog__body" style="padding: 20px;">
-                  <p style="color: var(--color-text); margin: 0 0 16px; font-family: var(--font-ui); font-size: 13px;">
-                    Delete tool T{{ deleteConfirm }}?
-                  </p>
-                  <div class="dialog__footer" style="border: none; padding: 0; justify-content: flex-end;">
-                    <button class="dialog__btn dialog__btn--secondary" @click="deleteConfirm = null">Cancel</button>
-                    <button class="dialog__btn" style="background: var(--color-error); border-color: var(--color-error); color: white;" @click="executeDelete">Delete</button>
-                  </div>
+          <div
+            class="dialog-overlay"
+            v-if="deleteConfirm !== null"
+            @click.self="deleteConfirm = null"
+          >
+            <div class="dialog" style="width: 320px">
+              <div class="dialog__body" style="padding: 20px">
+                <p
+                  style="
+                    color: var(--color-text);
+                    margin: 0 0 16px;
+                    font-family: var(--font-ui);
+                    font-size: 13px;
+                  "
+                >
+                  Delete tool T{{ deleteConfirm }}?
+                </p>
+                <div
+                  class="dialog__footer"
+                  style="border: none; padding: 0; justify-content: flex-end"
+                >
+                  <button
+                    class="dialog__btn dialog__btn--secondary"
+                    style="margin-right: 8px"
+                    @click="deleteConfirm = null"
+                  >
+                    Cancel
+                  </button>
+                  <button class="dialog__btn dialog__btn--danger" @click="executeDelete">
+                    Delete
+                  </button>
                 </div>
               </div>
             </div>
-          </Teleport>
+          </div>
 
           <div class="tool-panel__footer" v-if="!editingTool">
             <span class="tool-panel__count">{{ sortedTools.length }} tools</span>
@@ -419,27 +453,27 @@ function resetDefaults(): void {
   border: 1px solid var(--color-border);
 }
 
-.tool-panel__badge[data-type="flat-end-mill"] {
+.tool-panel__badge[data-type='flat-end-mill'] {
   color: #7ee787;
   border-color: rgba(126, 231, 135, 0.2);
 }
 
-.tool-panel__badge[data-type="ball-end-mill"] {
+.tool-panel__badge[data-type='ball-end-mill'] {
   color: #d2a8ff;
   border-color: rgba(210, 168, 255, 0.2);
 }
 
-.tool-panel__badge[data-type="drill"] {
+.tool-panel__badge[data-type='drill'] {
   color: #58a6ff;
   border-color: rgba(88, 166, 255, 0.2);
 }
 
-.tool-panel__badge[data-type="forstner"] {
+.tool-panel__badge[data-type='forstner'] {
   color: #79c0ff;
   border-color: rgba(121, 192, 255, 0.2);
 }
 
-.tool-panel__badge[data-type="bull-nose"] {
+.tool-panel__badge[data-type='bull-nose'] {
   color: #ffa657;
   border-color: rgba(255, 166, 87, 0.2);
 }
@@ -601,5 +635,41 @@ function resetDefaults(): void {
 .tool-panel__btn-text:hover {
   color: var(--color-text-secondary);
   text-decoration: underline;
+}
+</style>
+
+<style>
+.dialog__btn {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.dialog__btn--secondary {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.dialog__btn--secondary:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.dialog__btn--danger {
+  background: var(--color-error);
+  border: 1px solid var(--color-error);
+  color: white;
+  font-weight: 400;
+}
+
+.dialog__btn--danger:hover {
+  background: #d63c36;
+  border-color: #d63c36;
+  box-shadow: 0 2px 8px rgba(248, 81, 73, 0.35);
 }
 </style>
